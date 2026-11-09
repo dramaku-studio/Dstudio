@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "planHash": "b3dfb4f0b5204174717b02f9be9c1087fca445237177b5e5ac6e51bd3192d264",
+  "reviewerId": "local-demo-reviewer",
+  "entries": [
+    {
+      "shotId": "SC-001-SH-01",
+      "sceneId": "SC-001",
+      "assetVersionId": "fixture-SC-001-SH-01-v1",
+      "sha256": "2f974631efe2e3992d0b7ad3eb5d28b5c2c130a494a1b77ffaf40993eccad511",
+      "durationSec": 6
+    },
+    {
+      "shotId": "SC-001-SH-02",
+      "sceneId": "SC-001",
+      "assetVersionId": "fixture-SC-001-SH-02-v1",
+      "sha256": "2f974631efe2e3992d0b7ad3eb5d28b5c2c130a494a1b77ffaf40993eccad511",
+      "durationSec": 6
+    },
+    {
+      "shotId": "SC-002-SH-01",
+      "sceneId": "SC-002",
+      "assetVersionId": "fixture-SC-002-SH-01-v1",
+      "sha256": "2f974631efe2e3992d0b7ad3eb5d28b5c2c130a494a1b77ffaf40993eccad511",
+      "durationSec": 6
+    },
+    {
+      "shotId": "SC-002-SH-02",
+      "sceneId": "SC-002",
+      "assetVersionId": "fixture-SC-002-SH-02-v1",
+      "sha256": "2f974631efe2e3992d0b7ad3eb5d28b5c2c130a494a1b77ffaf40993eccad511",
+      "durationSec": 6
+    }
+  ],
+  "kind": "approved_takes_edit_ready",
+  "selectionHash": "b76053dffc900456d7190d5269b61bf7377bd2b6c104ae81de5e7f532466913a"
+}

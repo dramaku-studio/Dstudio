@@ -1,0 +1,76 @@
+name: Dramasaku CP-003 checks
+on:
+  push:
+  pull_request:
+jobs:
+  domain-and-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: dramasaku
+          POSTGRES_PASSWORD: integration_only
+          POSTGRES_DB: dramasaku
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dramasaku -d dramasaku"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://dramasaku:integration_only@localhost:5432/dramasaku
+      PAID_GENERATION_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts
+      - name: Install FFmpeg when missing
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y ffmpeg
+          fi
+      - name: Verify ffmpeg/ffprobe availability
+        run: ffmpeg -version && ffprobe -version
+      - run: npm test
+      - run: npm run db:migrate
+      - run: npm run test:integration
+        env:
+          DRAMASAKU_INTEGRATION_TEST: '1'
+
+  windows-console-smoke:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        node-version: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Windows operator secrets regression
+        run: node --test scripts/validate-operator-secrets.test.mjs
+      - name: Windows local dashboard startup smoke
+        shell: pwsh
+        run: |
+          $stdout = Join-Path $env:RUNNER_TEMP 'dramasaku-console.out'
+          $stderr = Join-Path $env:RUNNER_TEMP 'dramasaku-console.err'
+          $proc = Start-Process -FilePath 'node' -ArgumentList 'scripts/start-local-console.mjs' -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 40; $i++) {
+              Start-Sleep -Milliseconds 250
+              try {
+                $response = Invoke-RestMethod -Uri 'http://127.0.0.1:4184/api/health' -TimeoutSec 2
+                if ($response.ok -and -not $response.paidCallsEnabled) { $ready = $true; break }
+              } catch {}
+            }
+            if (-not $ready) {
+              Get-Content $stderr -ErrorAction SilentlyContinue
+              throw 'Dramasaku dashboard did not start on Windows'
+            }
+          } finally {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          }

@@ -1,0 +1,16 @@
+
+> dramasaku-studio@0.2.0 worker
+> node apps/worker/index.mjs
+
+{
+  "checkpoint": "CP-001",
+  "worker": "mock-only",
+  "taskId": "mock-cp001",
+  "result": {
+    "state": "succeeded",
+    "output": {
+      "kind": "mock-video",
+      "uri": null
+    }
+  }
+}

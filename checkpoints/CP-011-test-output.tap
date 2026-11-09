@@ -1,0 +1,626 @@
+
+> dramasaku-studio@0.4.0 test
+> node --test packages/domain/test/*.test.mjs packages/db/test/*.test.mjs packages/providers/test/*.test.mjs packages/media/test/*.test.mjs apps/worker/test/*.test.mjs packages/security/test/*.test.mjs apps/control-server/test/*.test.mjs
+
+TAP version 13
+# Subtest: Seedance console: authenticated catalog, magic-checked private attachments, previews, persisted drafts
+ok 1 - Seedance console: authenticated catalog, magic-checked private attachments, previews, persisted drafts
+  ---
+  duration_ms: 106.195402
+  type: 'test'
+  ...
+# Subtest: CP010 UI: first model shows 7 Seedance ratios and disables four other common ratios
+ok 2 - CP010 UI: first model shows 7 Seedance ratios and disables four other common ratios
+  ---
+  duration_ms: 3.458227
+  type: 'test'
+  ...
+# Subtest: CP010 UI: duration is step 1s with model maximum 15s or 30s
+ok 3 - CP010 UI: duration is step 1s with model maximum 15s or 30s
+  ---
+  duration_ms: 3.412878
+  type: 'test'
+  ...
+# Subtest: CP010 UI: Seedance 2.5 first frame forces adaptive, edit forces auto length
+ok 4 - CP010 UI: Seedance 2.5 first frame forces adaptive, edit forces auto length
+  ---
+  duration_ms: 2.145474
+  type: 'test'
+  ...
+# Subtest: local operator console: auth, CSRF, vault masking, mock workflow
+ok 5 - local operator console: auth, CSRF, vault masking, mock workflow
+  ---
+  duration_ms: 1001.439948
+  type: 'test'
+  ...
+# Subtest: server refuses public binding and missing administrative secrets
+ok 6 - server refuses public binding and missing administrative secrets
+  ---
+  duration_ms: 0.782666
+  type: 'test'
+  ...
+# Subtest: unified planner compiles screenplay and character DNA into shot DAG + prompts
+ok 7 - unified planner compiles screenplay and character DNA into shot DAG + prompts
+  ---
+  duration_ms: 2.329019
+  type: 'test'
+  ...
+# Subtest: workspace rejects missing speaker DNA and invalid boundaries
+ok 8 - workspace rejects missing speaker DNA and invalid boundaries
+  ---
+  duration_ms: 0.866062
+  type: 'test'
+  ...
+# Subtest: workspace saved with restricted filesystem permissions and restored
+ok 9 - workspace saved with restricted filesystem permissions and restored
+  ---
+  duration_ms: 26.460179
+  type: 'test'
+  ...
+# Subtest: one authenticated local UI serves creative planning and Seedance under a single origin
+ok 10 - one authenticated local UI serves creative planning and Seedance under a single origin
+  ---
+  duration_ms: 87.558872
+  type: 'test'
+  ...
+# Subtest: lost POST response creates unknown, never repeats the billable POST
+ok 11 - lost POST response creates unknown, never repeats the billable POST
+  ---
+  duration_ms: 1.284931
+  type: 'test'
+  ...
+# Subtest: explicit definitive rejection releases reservation instead of unknown
+ok 12 - explicit definitive rejection releases reservation instead of unknown
+  ---
+  duration_ms: 0.356566
+  type: 'test'
+  ...
+# Subtest: polling processing state is deferred, with no second POST
+ok 13 - polling processing state is deferred, with no second POST
+  ---
+  duration_ms: 1.599133
+  type: 'test'
+  ...
+# Subtest: success ingests verified video and atomically commits media + cost
+ok 14 - success ingests verified video and atomically commits media + cost
+  ---
+  duration_ms: 1.97679
+  type: 'test'
+  ...
+# Subtest: provider failed does not silently release funds or set cost zero
+ok 15 - provider failed does not silently release funds or set cost zero
+  ---
+  duration_ms: 0.335454
+  type: 'test'
+  ...
+# Subtest: CP003 queue has durable states, tenant FKs, unique task ID and asset version immutability
+ok 16 - CP003 queue has durable states, tenant FKs, unique task ID and asset version immutability
+  ---
+  duration_ms: 0.686522
+  type: 'test'
+  ...
+# Subtest: CP004 schema includes typed DAG, immutable versions and publish idempotency
+ok 17 - CP004 schema includes typed DAG, immutable versions and publish idempotency
+  ---
+  duration_ms: 0.814524
+  type: 'test'
+  ...
+# Subtest: credential reference schema does not include plaintext key columns
+ok 18 - credential reference schema does not include plaintext key columns
+  ---
+  duration_ms: 0.293251
+  type: 'test'
+  ...
+# Subtest: PostgreSQL CP003: durable claim, idempotency, playable-asset metadata, settlement, ambiguous POST quarantine
+ok 19 - PostgreSQL CP003: durable claim, idempotency, playable-asset metadata, settlement, ambiguous POST quarantine # SKIP
+  ---
+  duration_ms: 0.724128
+  type: 'test'
+  ...
+# Subtest: PostgreSQL: transactional approval, idempotency, concurrent holds, overrun
+ok 20 - PostgreSQL: transactional approval, idempotency, concurrent holds, overrun # SKIP
+  ---
+  duration_ms: 0.714103
+  type: 'test'
+  ...
+# Subtest: CP002 migration includes immutable approvals, idempotency, budget and durable outbox
+ok 21 - CP002 migration includes immutable approvals, idempotency, budget and durable outbox
+  ---
+  duration_ms: 5.62339
+  type: 'test'
+  ...
+# Subtest: CP002 plan approval requires membership and distinct human reviewer
+ok 22 - CP002 plan approval requires membership and distinct human reviewer
+  ---
+  duration_ms: 1.017319
+  type: 'test'
+  ...
+# Subtest: CP002 cannot self-approve even with elevated role; transaction rolls back
+ok 23 - CP002 cannot self-approve even with elevated role; transaction rolls back
+  ---
+  duration_ms: 0.744378
+  type: 'test'
+  ...
+# Subtest: CP002 create run atomically writes account, idempotency and outbox
+ok 24 - CP002 create run atomically writes account, idempotency and outbox
+  ---
+  duration_ms: 3.627841
+  type: 'test'
+  ...
+# Subtest: CP002 repeat idempotency key returns existing run without duplicate write
+ok 25 - CP002 repeat idempotency key returns existing run without duplicate write
+  ---
+  duration_ms: 1.058961
+  type: 'test'
+  ...
+# Subtest: CP002 reject changed payload under same idempotency key
+ok 26 - CP002 reject changed payload under same idempotency key
+  ---
+  duration_ms: 0.41926
+  type: 'test'
+  ...
+# Subtest: CP002 reserve generation enqueues intent AFTER budget hold, no external POST
+ok 27 - CP002 reserve generation enqueues intent AFTER budget hold, no external POST
+  ---
+  duration_ms: 0.657238
+  type: 'test'
+  ...
+# Subtest: CP002 reserve rejects expensive attempt and rolls back without ledger/event
+ok 28 - CP002 reserve rejects expensive attempt and rolls back without ledger/event
+  ---
+  duration_ms: 0.204697
+  type: 'test'
+  ...
+# Subtest: CP002 expired capability blocks paid reservation
+ok 29 - CP002 expired capability blocks paid reservation
+  ---
+  duration_ms: 0.472359
+  type: 'test'
+  ...
+# Subtest: CP002 settlement records overrun, blocks budget, preserves real billed amount
+ok 30 - CP002 settlement records overrun, blocks budget, preserves real billed amount
+  ---
+  duration_ms: 5.958243
+  type: 'test'
+  ...
+# Subtest: CP002 unknown submit outcome blocks further spending without repeat POST
+ok 31 - CP002 unknown submit outcome blocks further spending without repeat POST
+  ---
+  duration_ms: 0.515364
+  type: 'test'
+  ...
+# Subtest: CP002 unknown DAG type rejected before paid work
+ok 32 - CP002 unknown DAG type rejected before paid work
+  ---
+  duration_ms: 1.097529
+  type: 'test'
+  ...
+# Subtest: CP002 snapshot hash canonicalizes property order and nested structure
+ok 33 - CP002 snapshot hash canonicalizes property order and nested structure
+  ---
+  duration_ms: 1.032181
+  type: 'test'
+  ...
+# Subtest: CP002 overrun records actual amount and freezes fresh expense
+ok 34 - CP002 overrun records actual amount and freezes fresh expense
+  ---
+  duration_ms: 0.780463
+  type: 'test'
+  ...
+# Subtest: CP002 manifest rejects mismatched plan, shot asset or selection hash
+ok 35 - CP002 manifest rejects mismatched plan, shot asset or selection hash
+  ---
+  duration_ms: 1.346002
+  type: 'test'
+  ...
+# Subtest: screenplay stable scenes and preserved dialogue
+ok 36 - screenplay stable scenes and preserved dialogue
+  ---
+  duration_ms: 4.870618
+  type: 'test'
+  ...
+# Subtest: story rejects NUL and huge documents
+ok 37 - story rejects NUL and huge documents
+  ---
+  duration_ms: 1.77405
+  type: 'test'
+  ...
+# Subtest: DNA locks require authority, prevent duplicate actor ids
+ok 38 - DNA locks require authority, prevent duplicate actor ids
+  ---
+  duration_ms: 0.293811
+  type: 'test'
+  ...
+# Subtest: plan produces per-shot DAG and final manifest gate
+ok 39 - plan produces per-shot DAG and final manifest gate
+  ---
+  duration_ms: 0.168684
+  type: 'test'
+  ...
+# Subtest: changing version affects deterministic snapshot
+ok 40 - changing version affects deterministic snapshot
+  ---
+  duration_ms: 0.720483
+  type: 'test'
+  ...
+# Subtest: plan fails on speaker not in DNA
+ok 41 - plan fails on speaker not in DNA
+  ---
+  duration_ms: 0.999251
+  type: 'test'
+  ...
+# Subtest: compiler embeds pinned hashes without rewriting dialogue
+ok 42 - compiler embeds pinned hashes without rewriting dialogue
+  ---
+  duration_ms: 1.486584
+  type: 'test'
+  ...
+# Subtest: compiler rejects unverified capabilities
+ok 43 - compiler rejects unverified capabilities
+  ---
+  duration_ms: 0.173561
+  type: 'test'
+  ...
+# Subtest: scoped invalidation only chosen shot downstream
+ok 44 - scoped invalidation only chosen shot downstream
+  ---
+  duration_ms: 1.534255
+  type: 'test'
+  ...
+# Subtest: manifest requires exact approved selection
+ok 45 - manifest requires exact approved selection
+  ---
+  duration_ms: 4.71155
+  type: 'test'
+  ...
+# Subtest: manifest blocks missing, stale and critical flagged
+ok 46 - manifest blocks missing, stale and critical flagged
+  ---
+  duration_ms: 0.378528
+  type: 'test'
+  ...
+# Subtest: QA flags mismatch despite high score
+ok 47 - QA flags mismatch despite high score
+  ---
+  duration_ms: 1.032382
+  type: 'test'
+  ...
+# Subtest: QA rejects missing media integrity
+ok 48 - QA rejects missing media integrity
+  ---
+  duration_ms: 0.147302
+  type: 'test'
+  ...
+# Subtest: revision respects bounded retry and cost
+ok 49 - revision respects bounded retry and cost
+  ---
+  duration_ms: 0.269195
+  type: 'test'
+  ...
+# Subtest: publishing is dry-run and requires release approval
+ok 50 - publishing is dry-run and requires release approval
+  ---
+  duration_ms: 0.35262
+  type: 'test'
+  ...
+# Subtest: silent/unverified dialogue fails QA and export needs documented exception
+ok 51 - silent/unverified dialogue fails QA and export needs documented exception
+  ---
+  duration_ms: 0.37285
+  type: 'test'
+  ...
+# Subtest: AT19 graph order valid
+ok 52 - AT19 graph order valid
+  ---
+  duration_ms: 2.013656
+  type: 'test'
+  ...
+# Subtest: AT19 reject cycle
+ok 53 - AT19 reject cycle
+  ---
+  duration_ms: 4.461824
+  type: 'test'
+  ...
+# Subtest: AT25 affected nodes only
+ok 54 - AT25 affected nodes only
+  ---
+  duration_ms: 0.329525
+  type: 'test'
+  ...
+# Subtest: AT22 budget holds cannot exceed cap
+ok 55 - AT22 budget holds cannot exceed cap
+  ---
+  duration_ms: 0.314553
+  type: 'test'
+  ...
+# Subtest: AT20 same reservation is idempotent
+ok 56 - AT20 same reservation is idempotent
+  ---
+  duration_ms: 0.129965
+  type: 'test'
+  ...
+# Subtest: AT32 settlement accounts for variance
+ok 57 - AT32 settlement accounts for variance
+  ---
+  duration_ms: 0.271167
+  type: 'test'
+  ...
+# Subtest: AT21 stale plans cannot dispatch
+ok 58 - AT21 stale plans cannot dispatch
+  ---
+  duration_ms: 0.324357
+  type: 'test'
+  ...
+# Subtest: No dispatch when unverified provider
+ok 59 - No dispatch when unverified provider
+  ---
+  duration_ms: 0.261282
+  type: 'test'
+  ...
+# Subtest: AT26 high score with critical flag requires human
+ok 60 - AT26 high score with critical flag requires human
+  ---
+  duration_ms: 0.304227
+  type: 'test'
+  ...
+# Subtest: AT28 unauthorised or self approval blocked
+ok 61 - AT28 unauthorised or self approval blocked
+  ---
+  duration_ms: 3.916335
+  type: 'test'
+  ...
+# Subtest: Critical finding cannot be approved without reason
+ok 62 - Critical finding cannot be approved without reason
+  ---
+  duration_ms: 0.225058
+  type: 'test'
+  ...
+# Subtest: AT23 retry cap enforced
+ok 63 - AT23 retry cap enforced
+  ---
+  duration_ms: 0.185428
+  type: 'test'
+  ...
+# Subtest: AT27 only approved take exported
+ok 64 - AT27 only approved take exported
+  ---
+  duration_ms: 1.672383
+  type: 'test'
+  ...
+# Subtest: Stable snapshot hash
+ok 65 - Stable snapshot hash
+  ---
+  duration_ms: 2.068638
+  type: 'test'
+  ...
+# Subtest: Mock provider accepts and returns fixture only
+ok 66 - Mock provider accepts and returns fixture only
+  ---
+  duration_ms: 0.272489
+  type: 'test'
+  ...
+# Subtest: fails closed when readiness data is absent
+ok 67 - fails closed when readiness data is absent
+  ---
+  duration_ms: 1.193223
+  type: 'test'
+  ...
+# Subtest: having a configured key alone does not allow paid generation
+ok 68 - having a configured key alone does not allow paid generation
+  ---
+  duration_ms: 0.368924
+  type: 'test'
+  ...
+# Subtest: must have all explicit gates and flag
+ok 69 - must have all explicit gates and flag
+  ---
+  duration_ms: 0.189294
+  type: 'test'
+  ...
+# Subtest: asset upload magic bytes, private index, persistent drafts; no billable network
+ok 70 - asset upload magic bytes, private index, persistent drafts; no billable network
+  ---
+  duration_ms: 48.205705
+  type: 'test'
+  ...
+# Subtest: HTTP bridge submit, status, MP4 bytes and sha256 verified end-to-end
+ok 71 - HTTP bridge submit, status, MP4 bytes and sha256 verified end-to-end
+  ---
+  duration_ms: 265.01517
+  type: 'test'
+  ...
+# Subtest: paid POST requires explicit key, rejects traversal in task path
+ok 72 - paid POST requires explicit key, rejects traversal in task path
+  ---
+  duration_ms: 0.909767
+  type: 'test'
+  ...
+# Subtest: bridge rejects untrusted non-HTTPS and URL credentials
+ok 73 - bridge rejects untrusted non-HTTPS and URL credentials
+  ---
+  duration_ms: 0.301143
+  type: 'test'
+  ...
+# Subtest: unexpected 502 / redirect response on POST is ambiguous (not safe to auto-retry)
+ok 74 - unexpected 502 / redirect response on POST is ambiguous (not safe to auto-retry)
+  ---
+  duration_ms: 1.604811
+  type: 'test'
+  ...
+# Subtest: explicit definitely-not-accepted rejection can release a hold
+ok 75 - explicit definitely-not-accepted rejection can release a hold
+  ---
+  duration_ms: 1.050919
+  type: 'test'
+  ...
+# Subtest: video store rejects forged MP4 header and removes partial files
+ok 76 - video store rejects forged MP4 header and removes partial files
+  ---
+  duration_ms: 3.471456
+  type: 'test'
+  ...
+# Subtest: video store blocks oversized streaming payload
+ok 77 - video store blocks oversized streaming payload
+  ---
+  duration_ms: 1.913205
+  type: 'test'
+  ...
+# Subtest: video store rejects valid-looking header with invalid MP4 moov/readability
+ok 78 - video store rejects valid-looking header with invalid MP4 moov/readability
+  ---
+  duration_ms: 63.901773
+  type: 'test'
+  ...
+# Subtest: strict media size mismatch prevents storing truncated response
+ok 79 - strict media size mismatch prevents storing truncated response
+  ---
+  duration_ms: 2.961567
+  type: 'test'
+  ...
+# Subtest: LAS adapter blocked by default even with API key; cannot bypass budget
+ok 80 - LAS adapter blocked by default even with API key; cannot bypass budget
+  ---
+  duration_ms: 1.974807
+  type: 'test'
+  ...
+# Subtest: LAS provider submit accepted task and GET status with mocked transport
+ok 81 - LAS provider submit accepted task and GET status with mocked transport
+  ---
+  duration_ms: 40.524573
+  type: 'test'
+  ...
+# Subtest: LAS ambiguous POST must not be automatically retried
+ok 82 - LAS ambiguous POST must not be automatically retried
+  ---
+  duration_ms: 0.467663
+  type: 'test'
+  ...
+# Subtest: catalog includes 2.0 tiers and 2.5 with no paid calls
+ok 83 - catalog includes 2.0 tiers and 2.5 with no paid calls
+  ---
+  duration_ms: 1.115827
+  type: 'test'
+  ...
+# Subtest: T2V yields official-shaped payload preview but no submission
+ok 84 - T2V yields official-shaped payload preview but no submission
+  ---
+  duration_ms: 2.880298
+  type: 'test'
+  ...
+# Subtest: image-to-video first frame requires role and asset
+ok 85 - image-to-video first frame requires role and asset
+  ---
+  duration_ms: 0.668104
+  type: 'test'
+  ...
+# Subtest: first & last frames and reference mode compile
+ok 86 - first & last frames and reference mode compile
+  ---
+  duration_ms: 0.296145
+  type: 'test'
+  ...
+# Subtest: unknown models, invalid settings, wrong media role rejected server-side
+ok 87 - unknown models, invalid settings, wrong media role rejected server-side
+  ---
+  duration_ms: 0.350547
+  type: 'test'
+  ...
+# Subtest: audio refs unavailable for 2.0 conservative profile
+ok 88 - audio refs unavailable for 2.0 conservative profile
+  ---
+  duration_ms: 0.158918
+  type: 'test'
+  ...
+# Subtest: 2.5 draft and adaptive ratio constraints are enforced
+ok 89 - 2.5 draft and adaptive ratio constraints are enforced
+  ---
+  duration_ms: 0.372169
+  type: 'test'
+  ...
+# Subtest: edit, extend, and reference combination validated
+ok 90 - edit, extend, and reference combination validated
+  ---
+  duration_ms: 0.245379
+  type: 'test'
+  ...
+# Subtest: 2.5 edit auto duration is accepted with adaptive ratio only
+ok 91 - 2.5 edit auto duration is accepted with adaptive ratio only
+  ---
+  duration_ms: 0.701744
+  type: 'test'
+  ...
+# Subtest: CP010: all native aspect ratio presets accepted and common non-native formats blocked
+ok 92 - CP010: all native aspect ratio presets accepted and common non-native formats blocked
+  ---
+  duration_ms: 2.443502
+  type: 'test'
+  ...
+# Subtest: CP010: every supported whole-second duration is valid per Seedance model, fractional and out-of-range are blocked
+ok 93 - CP010: every supported whole-second duration is valid per Seedance model, fractional and out-of-range are blocked
+  ---
+  duration_ms: 0.739941
+  type: 'test'
+  ...
+# Subtest: CP010: Seedance 2.5 special ratio and duration constraints remain enforced
+ok 94 - CP010: Seedance 2.5 special ratio and duration constraints remain enforced
+  ---
+  duration_ms: 0.202004
+  type: 'test'
+  ...
+# Subtest: CP010: 2.0 edit / extend may use supported explicit ratio (2.5 differs)
+ok 95 - CP010: 2.0 edit / extend may use supported explicit ratio (2.5 differs)
+  ---
+  duration_ms: 0.168143
+  type: 'test'
+  ...
+# Subtest: secret encrypted at rest; only metadata returned
+ok 96 - secret encrypted at rest; only metadata returned
+  ---
+  duration_ms: 10.698706
+  type: 'test'
+  ...
+# Subtest: vault mode at file creation 0600
+ok 97 - vault mode at file creation 0600
+  ---
+  duration_ms: 2.812315
+  type: 'test'
+  ...
+# Subtest: tamper detection blocks decryption
+ok 98 - tamper detection blocks decryption
+  ---
+  duration_ms: 3.493409
+  type: 'test'
+  ...
+# Subtest: wrong master key refuses decryption
+ok 99 - wrong master key refuses decryption
+  ---
+  duration_ms: 3.482673
+  type: 'test'
+  ...
+# Subtest: slot allowlist and min length enforcement
+ok 100 - slot allowlist and min length enforcement
+  ---
+  duration_ms: 0.850067
+  type: 'test'
+  ...
+# Subtest: concurrent writes do not drop other slots
+ok 101 - concurrent writes do not drop other slots
+  ---
+  duration_ms: 4.218869
+  type: 'test'
+  ...
+# Subtest: master env validation
+ok 102 - master env validation
+  ---
+  duration_ms: 0.360942
+  type: 'test'
+  ...
+1..102
+# tests 102
+# suites 0
+# pass 100
+# fail 0
+# cancelled 0
+# skipped 2
+# todo 0
+# duration_ms 1303.286962

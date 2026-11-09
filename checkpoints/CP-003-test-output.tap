@@ -1,0 +1,296 @@
+
+> dramasaku-studio@0.3.0 test
+> node --test packages/domain/test/*.test.mjs packages/db/test/*.test.mjs packages/providers/test/*.test.mjs packages/media/test/*.test.mjs apps/worker/test/*.test.mjs
+
+TAP version 13
+# Subtest: lost POST response creates unknown, never repeats the billable POST
+ok 1 - lost POST response creates unknown, never repeats the billable POST
+  ---
+  duration_ms: 2.192135
+  type: 'test'
+  ...
+# Subtest: explicit definitive rejection releases reservation instead of unknown
+ok 2 - explicit definitive rejection releases reservation instead of unknown
+  ---
+  duration_ms: 0.31216
+  type: 'test'
+  ...
+# Subtest: polling processing state is deferred, with no second POST
+ok 3 - polling processing state is deferred, with no second POST
+  ---
+  duration_ms: 1.695969
+  type: 'test'
+  ...
+# Subtest: success ingests verified video and atomically commits media + cost
+ok 4 - success ingests verified video and atomically commits media + cost
+  ---
+  duration_ms: 3.295567
+  type: 'test'
+  ...
+# Subtest: provider failed does not silently release funds or set cost zero
+ok 5 - provider failed does not silently release funds or set cost zero
+  ---
+  duration_ms: 0.372528
+  type: 'test'
+  ...
+# Subtest: CP003 queue has durable states, tenant FKs, unique task ID and asset version immutability
+ok 6 - CP003 queue has durable states, tenant FKs, unique task ID and asset version immutability
+  ---
+  duration_ms: 2.353076
+  type: 'test'
+  ...
+# Subtest: PostgreSQL CP003: durable claim, idempotency, playable-asset metadata, settlement, ambiguous POST quarantine
+ok 7 - PostgreSQL CP003: durable claim, idempotency, playable-asset metadata, settlement, ambiguous POST quarantine # SKIP
+  ---
+  duration_ms: 0.890558
+  type: 'test'
+  ...
+# Subtest: PostgreSQL: transactional approval, idempotency, concurrent holds, overrun
+ok 8 - PostgreSQL: transactional approval, idempotency, concurrent holds, overrun # SKIP
+  ---
+  duration_ms: 1.366017
+  type: 'test'
+  ...
+# Subtest: CP002 migration includes immutable approvals, idempotency, budget and durable outbox
+ok 9 - CP002 migration includes immutable approvals, idempotency, budget and durable outbox
+  ---
+  duration_ms: 10.583132
+  type: 'test'
+  ...
+# Subtest: CP002 plan approval requires membership and distinct human reviewer
+ok 10 - CP002 plan approval requires membership and distinct human reviewer
+  ---
+  duration_ms: 1.598738
+  type: 'test'
+  ...
+# Subtest: CP002 cannot self-approve even with elevated role; transaction rolls back
+ok 11 - CP002 cannot self-approve even with elevated role; transaction rolls back
+  ---
+  duration_ms: 0.775818
+  type: 'test'
+  ...
+# Subtest: CP002 create run atomically writes account, idempotency and outbox
+ok 12 - CP002 create run atomically writes account, idempotency and outbox
+  ---
+  duration_ms: 3.751849
+  type: 'test'
+  ...
+# Subtest: CP002 repeat idempotency key returns existing run without duplicate write
+ok 13 - CP002 repeat idempotency key returns existing run without duplicate write
+  ---
+  duration_ms: 0.681956
+  type: 'test'
+  ...
+# Subtest: CP002 reject changed payload under same idempotency key
+ok 14 - CP002 reject changed payload under same idempotency key
+  ---
+  duration_ms: 0.446549
+  type: 'test'
+  ...
+# Subtest: CP002 reserve generation enqueues intent AFTER budget hold, no external POST
+ok 15 - CP002 reserve generation enqueues intent AFTER budget hold, no external POST
+  ---
+  duration_ms: 1.165182
+  type: 'test'
+  ...
+# Subtest: CP002 reserve rejects expensive attempt and rolls back without ledger/event
+ok 16 - CP002 reserve rejects expensive attempt and rolls back without ledger/event
+  ---
+  duration_ms: 0.379568
+  type: 'test'
+  ...
+# Subtest: CP002 expired capability blocks paid reservation
+ok 17 - CP002 expired capability blocks paid reservation
+  ---
+  duration_ms: 0.447537
+  type: 'test'
+  ...
+# Subtest: CP002 settlement records overrun, blocks budget, preserves real billed amount
+ok 18 - CP002 settlement records overrun, blocks budget, preserves real billed amount
+  ---
+  duration_ms: 1.499348
+  type: 'test'
+  ...
+# Subtest: CP002 unknown submit outcome blocks further spending without repeat POST
+ok 19 - CP002 unknown submit outcome blocks further spending without repeat POST
+  ---
+  duration_ms: 1.427758
+  type: 'test'
+  ...
+# Subtest: CP002 unknown DAG type rejected before paid work
+ok 20 - CP002 unknown DAG type rejected before paid work
+  ---
+  duration_ms: 2.930724
+  type: 'test'
+  ...
+# Subtest: CP002 snapshot hash canonicalizes property order and nested structure
+ok 21 - CP002 snapshot hash canonicalizes property order and nested structure
+  ---
+  duration_ms: 1.679881
+  type: 'test'
+  ...
+# Subtest: CP002 overrun records actual amount and freezes fresh expense
+ok 22 - CP002 overrun records actual amount and freezes fresh expense
+  ---
+  duration_ms: 0.54174
+  type: 'test'
+  ...
+# Subtest: CP002 manifest rejects mismatched plan, shot asset or selection hash
+ok 23 - CP002 manifest rejects mismatched plan, shot asset or selection hash
+  ---
+  duration_ms: 1.797294
+  type: 'test'
+  ...
+# Subtest: AT19 graph order valid
+ok 24 - AT19 graph order valid
+  ---
+  duration_ms: 2.195566
+  type: 'test'
+  ...
+# Subtest: AT19 reject cycle
+ok 25 - AT19 reject cycle
+  ---
+  duration_ms: 1.441791
+  type: 'test'
+  ...
+# Subtest: AT25 affected nodes only
+ok 26 - AT25 affected nodes only
+  ---
+  duration_ms: 0.258784
+  type: 'test'
+  ...
+# Subtest: AT22 budget holds cannot exceed cap
+ok 27 - AT22 budget holds cannot exceed cap
+  ---
+  duration_ms: 0.714277
+  type: 'test'
+  ...
+# Subtest: AT20 same reservation is idempotent
+ok 28 - AT20 same reservation is idempotent
+  ---
+  duration_ms: 0.200059
+  type: 'test'
+  ...
+# Subtest: AT32 settlement accounts for variance
+ok 29 - AT32 settlement accounts for variance
+  ---
+  duration_ms: 0.260125
+  type: 'test'
+  ...
+# Subtest: AT21 stale plans cannot dispatch
+ok 30 - AT21 stale plans cannot dispatch
+  ---
+  duration_ms: 0.48924
+  type: 'test'
+  ...
+# Subtest: No dispatch when unverified provider
+ok 31 - No dispatch when unverified provider
+  ---
+  duration_ms: 0.370523
+  type: 'test'
+  ...
+# Subtest: AT26 high score with critical flag requires human
+ok 32 - AT26 high score with critical flag requires human
+  ---
+  duration_ms: 0.847436
+  type: 'test'
+  ...
+# Subtest: AT28 unauthorised or self approval blocked
+ok 33 - AT28 unauthorised or self approval blocked
+  ---
+  duration_ms: 1.975337
+  type: 'test'
+  ...
+# Subtest: Critical finding cannot be approved without reason
+ok 34 - Critical finding cannot be approved without reason
+  ---
+  duration_ms: 0.207243
+  type: 'test'
+  ...
+# Subtest: AT23 retry cap enforced
+ok 35 - AT23 retry cap enforced
+  ---
+  duration_ms: 0.247437
+  type: 'test'
+  ...
+# Subtest: AT27 only approved take exported
+ok 36 - AT27 only approved take exported
+  ---
+  duration_ms: 0.379932
+  type: 'test'
+  ...
+# Subtest: Stable snapshot hash
+ok 37 - Stable snapshot hash
+  ---
+  duration_ms: 0.641388
+  type: 'test'
+  ...
+# Subtest: Mock provider accepts and returns fixture only
+ok 38 - Mock provider accepts and returns fixture only
+  ---
+  duration_ms: 0.197831
+  type: 'test'
+  ...
+# Subtest: HTTP bridge submit, status, MP4 bytes and sha256 verified end-to-end
+ok 39 - HTTP bridge submit, status, MP4 bytes and sha256 verified end-to-end
+  ---
+  duration_ms: 294.02582
+  type: 'test'
+  ...
+# Subtest: paid POST requires explicit key, rejects traversal in task path
+ok 40 - paid POST requires explicit key, rejects traversal in task path
+  ---
+  duration_ms: 1.521579
+  type: 'test'
+  ...
+# Subtest: bridge rejects untrusted non-HTTPS and URL credentials
+ok 41 - bridge rejects untrusted non-HTTPS and URL credentials
+  ---
+  duration_ms: 1.003053
+  type: 'test'
+  ...
+# Subtest: unexpected 502 / redirect response on POST is ambiguous (not safe to auto-retry)
+ok 42 - unexpected 502 / redirect response on POST is ambiguous (not safe to auto-retry)
+  ---
+  duration_ms: 2.048224
+  type: 'test'
+  ...
+# Subtest: explicit definitely-not-accepted rejection can release a hold
+ok 43 - explicit definitely-not-accepted rejection can release a hold
+  ---
+  duration_ms: 2.542243
+  type: 'test'
+  ...
+# Subtest: video store rejects forged MP4 header and removes partial files
+ok 44 - video store rejects forged MP4 header and removes partial files
+  ---
+  duration_ms: 9.183713
+  type: 'test'
+  ...
+# Subtest: video store blocks oversized streaming payload
+ok 45 - video store blocks oversized streaming payload
+  ---
+  duration_ms: 4.405989
+  type: 'test'
+  ...
+# Subtest: video store rejects valid-looking header with invalid MP4 moov/readability
+ok 46 - video store rejects valid-looking header with invalid MP4 moov/readability
+  ---
+  duration_ms: 88.182289
+  type: 'test'
+  ...
+# Subtest: strict media size mismatch prevents storing truncated response
+ok 47 - strict media size mismatch prevents storing truncated response
+  ---
+  duration_ms: 4.846493
+  type: 'test'
+  ...
+1..47
+# tests 47
+# suites 0
+# pass 45
+# fail 0
+# cancelled 0
+# skipped 2
+# todo 0
+# duration_ms 831.030782

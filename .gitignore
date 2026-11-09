@@ -1,0 +1,12 @@
+node_modules
+.next
+.env
+.env.local
+coverage
+*.log
+.DS_Store
+
+.local-private/
+cp003-demo/
+cp004-demo/
+*.enc.json

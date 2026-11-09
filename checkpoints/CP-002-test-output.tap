@@ -1,0 +1,200 @@
+
+> dramasaku-studio@0.2.0 test
+> node --test packages/domain/test/*.test.mjs packages/db/test/*.test.mjs
+
+TAP version 13
+# Subtest: PostgreSQL: transactional approval, idempotency, concurrent holds, overrun
+ok 1 - PostgreSQL: transactional approval, idempotency, concurrent holds, overrun # SKIP
+  ---
+  duration_ms: 0.512473
+  type: 'test'
+  ...
+# Subtest: CP002 migration includes immutable approvals, idempotency, budget and durable outbox
+ok 2 - CP002 migration includes immutable approvals, idempotency, budget and durable outbox
+  ---
+  duration_ms: 6.310468
+  type: 'test'
+  ...
+# Subtest: CP002 plan approval requires membership and distinct human reviewer
+ok 3 - CP002 plan approval requires membership and distinct human reviewer
+  ---
+  duration_ms: 0.796822
+  type: 'test'
+  ...
+# Subtest: CP002 cannot self-approve even with elevated role; transaction rolls back
+ok 4 - CP002 cannot self-approve even with elevated role; transaction rolls back
+  ---
+  duration_ms: 0.543179
+  type: 'test'
+  ...
+# Subtest: CP002 create run atomically writes account, idempotency and outbox
+ok 5 - CP002 create run atomically writes account, idempotency and outbox
+  ---
+  duration_ms: 2.018034
+  type: 'test'
+  ...
+# Subtest: CP002 repeat idempotency key returns existing run without duplicate write
+ok 6 - CP002 repeat idempotency key returns existing run without duplicate write
+  ---
+  duration_ms: 0.469438
+  type: 'test'
+  ...
+# Subtest: CP002 reject changed payload under same idempotency key
+ok 7 - CP002 reject changed payload under same idempotency key
+  ---
+  duration_ms: 0.474476
+  type: 'test'
+  ...
+# Subtest: CP002 reserve generation enqueues intent AFTER budget hold, no external POST
+ok 8 - CP002 reserve generation enqueues intent AFTER budget hold, no external POST
+  ---
+  duration_ms: 0.605664
+  type: 'test'
+  ...
+# Subtest: CP002 reserve rejects expensive attempt and rolls back without ledger/event
+ok 9 - CP002 reserve rejects expensive attempt and rolls back without ledger/event
+  ---
+  duration_ms: 0.216707
+  type: 'test'
+  ...
+# Subtest: CP002 expired capability blocks paid reservation
+ok 10 - CP002 expired capability blocks paid reservation
+  ---
+  duration_ms: 0.532644
+  type: 'test'
+  ...
+# Subtest: CP002 settlement records overrun, blocks budget, preserves real billed amount
+ok 11 - CP002 settlement records overrun, blocks budget, preserves real billed amount
+  ---
+  duration_ms: 0.94095
+  type: 'test'
+  ...
+# Subtest: CP002 unknown submit outcome blocks further spending without repeat POST
+ok 12 - CP002 unknown submit outcome blocks further spending without repeat POST
+  ---
+  duration_ms: 0.545924
+  type: 'test'
+  ...
+# Subtest: CP002 unknown DAG type rejected before paid work
+ok 13 - CP002 unknown DAG type rejected before paid work
+  ---
+  duration_ms: 1.081081
+  type: 'test'
+  ...
+# Subtest: CP002 snapshot hash canonicalizes property order and nested structure
+ok 14 - CP002 snapshot hash canonicalizes property order and nested structure
+  ---
+  duration_ms: 0.624492
+  type: 'test'
+  ...
+# Subtest: CP002 overrun records actual amount and freezes fresh expense
+ok 15 - CP002 overrun records actual amount and freezes fresh expense
+  ---
+  duration_ms: 0.51055
+  type: 'test'
+  ...
+# Subtest: CP002 manifest rejects mismatched plan, shot asset or selection hash
+ok 16 - CP002 manifest rejects mismatched plan, shot asset or selection hash
+  ---
+  duration_ms: 0.794158
+  type: 'test'
+  ...
+# Subtest: AT19 graph order valid
+ok 17 - AT19 graph order valid
+  ---
+  duration_ms: 1.921678
+  type: 'test'
+  ...
+# Subtest: AT19 reject cycle
+ok 18 - AT19 reject cycle
+  ---
+  duration_ms: 0.41766
+  type: 'test'
+  ...
+# Subtest: AT25 affected nodes only
+ok 19 - AT25 affected nodes only
+  ---
+  duration_ms: 0.377729
+  type: 'test'
+  ...
+# Subtest: AT22 budget holds cannot exceed cap
+ok 20 - AT22 budget holds cannot exceed cap
+  ---
+  duration_ms: 0.287564
+  type: 'test'
+  ...
+# Subtest: AT20 same reservation is idempotent
+ok 21 - AT20 same reservation is idempotent
+  ---
+  duration_ms: 0.236236
+  type: 'test'
+  ...
+# Subtest: AT32 settlement accounts for variance
+ok 22 - AT32 settlement accounts for variance
+  ---
+  duration_ms: 0.304449
+  type: 'test'
+  ...
+# Subtest: AT21 stale plans cannot dispatch
+ok 23 - AT21 stale plans cannot dispatch
+  ---
+  duration_ms: 0.307404
+  type: 'test'
+  ...
+# Subtest: No dispatch when unverified provider
+ok 24 - No dispatch when unverified provider
+  ---
+  duration_ms: 0.157227
+  type: 'test'
+  ...
+# Subtest: AT26 high score with critical flag requires human
+ok 25 - AT26 high score with critical flag requires human
+  ---
+  duration_ms: 0.35177
+  type: 'test'
+  ...
+# Subtest: AT28 unauthorised or self approval blocked
+ok 26 - AT28 unauthorised or self approval blocked
+  ---
+  duration_ms: 0.374064
+  type: 'test'
+  ...
+# Subtest: Critical finding cannot be approved without reason
+ok 27 - Critical finding cannot be approved without reason
+  ---
+  duration_ms: 0.155184
+  type: 'test'
+  ...
+# Subtest: AT23 retry cap enforced
+ok 28 - AT23 retry cap enforced
+  ---
+  duration_ms: 0.241694
+  type: 'test'
+  ...
+# Subtest: AT27 only approved take exported
+ok 29 - AT27 only approved take exported
+  ---
+  duration_ms: 0.185781
+  type: 'test'
+  ...
+# Subtest: Stable snapshot hash
+ok 30 - Stable snapshot hash
+  ---
+  duration_ms: 0.452723
+  type: 'test'
+  ...
+# Subtest: Mock provider accepts and returns fixture only
+ok 31 - Mock provider accepts and returns fixture only
+  ---
+  duration_ms: 0.174142
+  type: 'test'
+  ...
+1..31
+# tests 31
+# suites 0
+# pass 30
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 135.65556

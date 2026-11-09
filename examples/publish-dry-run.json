@@ -1,0 +1,10 @@
+{
+  "platform": "youtube",
+  "accountRef": "demo-account",
+  "caption": "Dramasaku offline test — fixture only",
+  "assetVersionId": "demo-final-v1",
+  "sha256": "a96d429aab4702001e7dc6ebf3328f3ad0ea185887a1d1ae39e7646fe024e239",
+  "deduplicationKey": "a78cf58e523586fa5a75275742eeaf4dd5f77a4f77d1f604ac9244e49a70240c",
+  "status": "dry_run_only",
+  "networkCalls": 0
+}

@@ -1,0 +1,50 @@
+{
+  "release": "CP020",
+  "version": "0.6.0",
+  "application": "dramasaku",
+  "date": "2026-11-08",
+  "tests": {
+    "node22": {
+      "tests": 198,
+      "pass": 196,
+      "fail": 0,
+      "skipped": 2
+    },
+    "node24": {
+      "tests": 198,
+      "pass": 196,
+      "fail": 0,
+      "skipped": 2
+    }
+  },
+  "paidGenerationEnabled": false,
+  "realProviderRequestsDuringTests": 0,
+  "liveAccountVerified": false,
+  "postgresTestsSkipped": 2,
+  "platform": "macOS arm64",
+  "windowsTested": false,
+  "portableProject": "cross-brand import tested in browser with media, video/voice drafts, timeline and recipient re-review",
+  "localFilm": {
+    "width": 1280,
+    "height": 720,
+    "fps": 24,
+    "durationRequestedSeconds": 5,
+    "browserDurationSeconds": 5.020996,
+    "actualAiMedia": false
+  },
+  "modeScope": [
+    "text_to_video",
+    "image_to_video",
+    "first_last",
+    "reference",
+    "edit"
+  ],
+  "extendSupported": false,
+  "sources": [
+    "https://aiide.apifox.cn/english/464722026e0",
+    "https://aiide.apifox.cn/english/9241613m0",
+    "https://aiide.apifox.cn/english/464722020e0",
+    "https://aiide.apifox.cn/english/464722031e0",
+    "https://aiide.apifox.cn/english/464722029e0"
+  ]
+}
