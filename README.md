@@ -1,5 +1,7 @@
 # Dramasaku Studio — CP022 AIIDE Model Plaza (0.8.0)
 
+**Panduan PDF untuk tim:** [Instalasi Dramasaku v0.8.0 - Windows/macOS](docs/guides/Panduan_Install_Dramasaku_Studio_v0.8.0.pdf). Mulai dengan tes lokal; jangan generate berbayar sebelum persetujuan. PDF dan ZIP aplikasi juga tersedia bersama di [rilis v0.8.0](https://github.com/warkai-id/dramasakustudio/releases/tag/v0.8.0).
+
 Untuk tim yang bekerja di komputer masing-masing dan bertukar berkas proyek.
 Jalankan `npm run dev`, buka `http://127.0.0.1:4184`, lalu masukkan kode akses dari terminal sendiri. Node.js 22/24 dan FFmpeg + FFprobe di PATH diperlukan. Mode lokal tidak memerlukan npm install atau PostgreSQL.
 
