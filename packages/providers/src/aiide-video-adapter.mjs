@@ -23,15 +23,18 @@ export function compileAiideVideoPayload(plan){
  if(plan?.contract!=='aiide-public-2026-11-08'||!model?.modes.includes(plan.mode)||plan.payload?.model!==model.id||typeof plan.payload?.prompt!=='string'||JSON.stringify(plan.payload).includes('LOCAL_ASSET_NOT_STAGED:'))throw new AiideVideoError('AIIDE_PAYLOAD_INVALID');
  return structuredClone(plan.payload);
 }
-export function createAiideVideoAdapter({apiKey,fetchImpl=fetch,networkAllowed=false,timeoutMs=30000}={}){
+export function createAiideVideoAdapter({apiKey,fetchImpl=fetch,networkAllowed=false,timeoutMs=30000,modelId=null}={}){
  if(typeof apiKey!=='string'||apiKey.trim().length<12)throw new AiideVideoError('AIIDE_KEY_REQUIRED');
  if(typeof fetchImpl!=='function'||!Number.isInteger(timeoutMs)||timeoutMs<1000||timeoutMs>120000)throw new AiideVideoError('AIIDE_ADAPTER_INVALID');
+ const statusModel=modelId===null?null:AIIDE_MODELS.find(m=>m.id===modelId);
+ if(modelId!==null&&!statusModel)throw new AiideVideoError('AIIDE_MODEL_NOT_DOCUMENTED');
+ const statusEndpoint=(statusModel?.origin||AIIDE_ORIGIN)+'/v1/video/generations/';
  const headers=()=>({authorization:`Bearer ${apiKey}`,'content-type':'application/json',accept:'application/json'});
  return Object.freeze({
   async submit(plan){
    if(!networkAllowed)throw new AiideVideoError('AIIDE_NETWORK_DISABLED');
    const payload=compileAiideVideoPayload(plan);
-   let r;try{r=await fetchImpl(AIIDE_ORIGIN+(['sora','veo'].includes(AIIDE_MODELS.find(m=>m.id===plan.model).family)?'/v1/videos':'/v1/video/generations'),{method:'POST',headers:headers(),body:JSON.stringify(payload),redirect:'manual',signal:AbortSignal.timeout(timeoutMs)});}catch{throw new AiideVideoError('AIIDE_SUBMISSION_UNKNOWN');}
+   let r;try{r=await fetchImpl((AIIDE_MODELS.find(m=>m.id===plan.model).origin||AIIDE_ORIGIN)+(['sora','veo'].includes(AIIDE_MODELS.find(m=>m.id===plan.model).family)?'/v1/videos':'/v1/video/generations'),{method:'POST',headers:headers(),body:JSON.stringify(payload),redirect:'manual',signal:AbortSignal.timeout(timeoutMs)});}catch{throw new AiideVideoError('AIIDE_SUBMISSION_UNKNOWN');}
    let data;try{data=await responseJson(r);}catch{throw new AiideVideoError('AIIDE_SUBMISSION_UNKNOWN',r.status);}
    const id=data?.task_id||data?.id||data?.data?.task_id;
    if(r.status>=200&&r.status<300&&taskId.test(id||''))return {providerTaskId:id};
@@ -41,7 +44,7 @@ export function createAiideVideoAdapter({apiKey,fetchImpl=fetch,networkAllowed=f
   async getStatus(id){
    if(!networkAllowed)throw new AiideVideoError('AIIDE_NETWORK_DISABLED');
    if(!taskId.test(id||''))throw new AiideVideoError('AIIDE_TASK_ID_INVALID');
-   let r;try{r=await fetchImpl(AIIDE_VIDEO_STATUS+encodeURIComponent(id),{method:'GET',headers:headers(),redirect:'manual',signal:AbortSignal.timeout(timeoutMs)});}catch{throw new AiideVideoError('AIIDE_POLL_UNAVAILABLE');}
+   let r;try{r=await fetchImpl(statusEndpoint+encodeURIComponent(id),{method:'GET',headers:headers(),redirect:'manual',signal:AbortSignal.timeout(timeoutMs)});}catch{throw new AiideVideoError('AIIDE_POLL_UNAVAILABLE');}
    if(!r.ok)throw new AiideVideoError('AIIDE_POLL_UNAVAILABLE',r.status);
    const data=await responseJson(r);
    // AIIDE returns both its outer task status and (for some upstreams) a nested status.

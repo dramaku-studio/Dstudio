@@ -94,6 +94,14 @@ export function createEncryptedKeyPools({file,key,clock=today}={}){
        if(dailyLimit!==undefined)item.dailyLimit=dailyLimit;if(priority!==undefined)item.priority=priority;if(enabled!==undefined)item.enabled=enabled;
        await save(data);return mask(item,clock());});
    },
+   async moveToVideo(id){
+     if(typeof id!=='string'||!/^[a-f0-9]{24}$/.test(id))throw bad('INVALID_KEY_ID');
+     return serialize(async()=>{const data=await read(),item=data.items.find(i=>i.id===id);
+       if(!item)throw bad('KEY_NOT_FOUND');
+       if(item.provider!=='aiide'||item.group!=='creative'||item.usedToday!==0)throw bad('KEY_MOVE_NOT_ALLOWED');
+       item.group='video';await save(data);return mask(item,clock());
+     });
+   },
    async remove(id){if(typeof id!=='string'||!/^[a-f0-9]{24}$/.test(id))throw bad('INVALID_KEY_ID');
      return serialize(async()=>{const data=await read();const n=data.items.length;data.items=data.items.filter(i=>i.id!==id);
        if(data.items.length===n)throw bad('KEY_NOT_FOUND');await save(data);return {removed:true};});

@@ -1,11 +1,13 @@
-# Dramasaku Studio — CP021 AIIDE Auto Activation (0.7.0)
+# Dramasaku Studio — CP022 AIIDE Model Plaza (0.8.0)
 
 Untuk tim yang bekerja di komputer masing-masing dan bertukar berkas proyek.
 Jalankan `npm run dev`, buka `http://127.0.0.1:4184`, lalu masukkan kode akses dari terminal sendiri. Node.js 22/24 dan FFmpeg + FFprobe di PATH diperlukan. Mode lokal tidak memerlukan npm install atau PostgreSQL.
 
+Integrasi CP022 menambahkan enam model Dreamina/Seedance Mini/2.5, daftar model akun, dan pemindahan key yang belum digunakan ke kelompok Video. [Detail integrasi dan batas parameter](docs/CP022_AIIDE_MODEL_PLAZA.md).
+
 Baca [MULAI_DI_SINI.txt](MULAI_DI_SINI.txt) untuk alur kerja, instalasi, upgrade, pemulihan cadangan, dan batas pemakaian.
 
-- Video: 14 profil model AIIDE, pilihan mode per model, referensi berperan, validasi, draf lengkap, dan Uji Mode Lokal tanpa jaringan provider.
+- Video: 20 profil model AIIDE, pilihan mode per model, referensi berperan, validasi, draf lengkap, dan Uji Mode Lokal tanpa jaringan provider.
 - Gambar/gerak/suara: draf tersimpan dan media lokal; generate gambar/TTS berbayar OFF.
 - Persetujuan: review aset mengikuti versi cerita. Identitas peninjau adalah catatan operator lokal.
 - Film: susun/trim gambar dan video, pilih audio, render MP4 dengan FFmpeg. Hasil adalah edit media lokal.

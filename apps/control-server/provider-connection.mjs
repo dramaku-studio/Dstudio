@@ -30,8 +30,10 @@ export function createProviderConnectionTester({keyPools,fetchImpl=fetch,cooldow
    if(response.status!==200)throw fail(response.status>=300&&response.status<400?'KEY_CHECK_REDIRECT_REFUSED':'KEY_CHECK_UNAVAILABLE',502);
    const data=await boundedJson(response);
    if(!Array.isArray(data?.data)||data.data.length>10000||data.data.some(m=>!m||typeof m.id!=='string'))throw fail('KEY_CHECK_INVALID_RESPONSE',502);
-   const ids=new Set(data.data.map(m=>m.id));
-   return {...base,state:'connected',catalogReadable:true,modelCount:ids.size,matchingVideoModels:AIIDE_MODELS.filter(m=>ids.has(m.id)).map(m=>m.id)};
+   const modelIds=[...new Set(data.data.map(m=>m.id))];
+   if(modelIds.some(id=>id.length>160||!/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/.test(id)||id===secret))throw fail('KEY_CHECK_INVALID_RESPONSE',502);
+   const ids=new Set(modelIds);
+   return {...base,state:'connected',catalogReadable:true,modelCount:ids.size,modelIds,matchingVideoModels:AIIDE_MODELS.filter(m=>ids.has(m.id)).map(m=>m.id)};
   }finally{active.delete(keyId);}
  }});
 }

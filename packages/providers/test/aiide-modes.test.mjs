@@ -21,7 +21,7 @@ for(const model of AIIDE_MODELS)for(const mode of model.modes)test(`AIIDE contra
 });
 test('unsupported modes/models/flags cannot be enabled by attaching a key',()=>{
  const input=request(AIIDE_MODELS[0],'text_to_video');
- for(const override of [{mode:'extend'},{model:'doubao-seedance-2-5-260628'},{model:'attacker-model'},{resolution:'1080p'},{seed:1},{draft:true},{duration:30}])assert.throws(()=>compileAiideRequest({...input,...override}));
+ for(const override of [{mode:'extend'},{model:'attacker-model'},{resolution:'1080p'},{seed:1},{draft:true},{duration:30}])assert.throws(()=>compileAiideRequest({...input,...override}));
  assert.equal(aiideVideoCatalog().modes.find(m=>m.id==='extend').disabled,true);
 });
 test('references enforce roles, counts, dimensions, duration, audio limits and explicit staging',()=>{

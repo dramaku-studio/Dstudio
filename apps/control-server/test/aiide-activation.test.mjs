@@ -31,7 +31,7 @@ test('auto activation is GET only, caches readiness, disables with key, rechecks
 test('invalid, limited, unavailable and unsupported catalogs cannot enable or submit',async t=>{
  const x=await setup(t);const key=await x.add();
  for(const status of [401,403,429,0]){x.setState(status);await x.activation.check(key.id,{fresh:true});assert.equal((await x.engine.list()).enabled,false);await assert.rejects(x.engine.submit({input,consent:'I_ACCEPT_PROVIDER_CHARGES'}),{code:'AIIDE_KEY_NOT_VERIFIED'});}
- x.setState(200);x.setModels(['unrelated-model']);await x.activation.check(key.id,{fresh:true});assert.equal((await x.engine.list()).enabled,false);
+ x.setState(200);x.setModels(['unrelated-model']);await x.activation.check(key.id,{fresh:true});assert.equal((await x.engine.list()).enabled,false);assert.equal((await x.engine.list()).activationState,'catalog_not_supported');
  await assert.rejects(x.engine.submit({input,consent:'I_ACCEPT_PROVIDER_CHARGES'}),{code:'AIIDE_MODEL_NOT_AVAILABLE'});assert.equal(x.counts().posts,0);
  assert.equal((await x.keys.preview('video','aiide')).selected.usedToday,0);
 });
@@ -42,3 +42,5 @@ test('cached valid key cannot bypass fresh validation; consent and parallel subm
  x.setState(200);const results=await Promise.allSettled([1,2].map(()=>x.engine.submit({input,consent:'I_ACCEPT_PROVIDER_CHARGES'})));
  assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='fulfilled').value.status,'submitted');assert.equal(x.counts().posts,1);
 });
+
+test('current AIIDE Model Plaza IDs activate only documented video models',async t=>{const x=await setup(t);await x.add();const models=['dreamina-seedance-2-0-fast-hc','dreamina-seedance-2-0-hc','dreamina-seedance-2-0-mini-hc','dreamina-seedance-2-5-hc','doubao-seedance-2-0-mini-260615','doubao-seedance-2-5-260628'];x.setModels([...models,'gpt-image-2','unknown-future-video']);const status=await x.engine.list();assert.equal(status.enabled,true);assert.deepEqual(status.availableModels,models);assert.deepEqual(x.counts(),{gets:1,posts:0});});

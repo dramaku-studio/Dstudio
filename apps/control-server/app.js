@@ -83,6 +83,7 @@ function sdRenderAssets(){const target=$('sd-assets');target.replaceChildren();i
 }
 function sdCanGenerate(live){return !!(live?.enabled&&(live.capabilityVerified||live.credentialVerified)&&live.configured&&live.usedToday<live.maxDaily&&(!live.autoActivation||live.availableModels.includes($('sd-model').value)));}
 function videoLiveHelp(live){
+ if(live?.activationState==='catalog_not_supported')return 'Key terhubung, tetapi model akun belum memiliki profil request yang didukung engine. Generate tetap terkunci; lihat daftar model melalui Periksa Koneksi.';
  if(!live?.enabled)return live?.autoActivation?'Engine belum siap ('+live.activationState+'). Tambahkan key Video / AIIDE yang valid dan memiliki model video. Uji Mode Lokal tetap tersedia.':'Mode offline: generate berbayar OFF.';
  if(!live?.configured)return 'Akun AIIDE belum terhubung. Periksa Kunci API sebelum membuat video.';
  if(!live.enabled)return 'Video baru belum diaktifkan. Video lama tetap bisa diambil tanpa membuat ulang.';
@@ -130,6 +131,7 @@ async function sdLoad(){
  // Mode availability comes from AIIDE's per-model contract registry.
  ['sd-upload-btn','sd-preview','sd-generate','sd-refresh'].forEach(id=>$(id).disabled=false);
  sdRevise();await sdRefresh();await sdRenderLiveJobs();
+ if(sdLiveConfiguration?.autoActivation&&sdLiveConfiguration.availableModels.length&&!sdLiveConfiguration.availableModels.includes($('sd-model').value)){$('sd-model').value=sdLiveConfiguration.availableModels[0];sdRevise();sdText('sd-live-status',videoLiveHelp(sdLiveConfiguration));}
 }
 async function sdRefresh(){
  const [a,j]=await Promise.all([api('/api/seedance/assets'),api('/api/aiide-video/drafts')]);
@@ -398,11 +400,12 @@ async function keyPoolsLoad(){
   const remove=document.createElement('button');remove.className='ghost danger';remove.type='button';remove.textContent='Hapus';
   remove.addEventListener('click',async()=>{if(!confirm(`Hapus kunci "${key.label}"?`))return;try{await api(`/api/key-pools/${key.id}`,{method:'DELETE'});await keyPoolsLoad();await sdRenderLiveJobs();}catch(e){$('pool-message').textContent=e.message;}});
   if(key.provider==='aiide'){
+   if(key.group==='creative'){const move=document.createElement('button');move.type='button';move.className='ghost';move.textContent='Pindahkan ke Video';move.onclick=async()=>{move.disabled=true;try{await api('/api/key-pools/move-to-video',{method:'POST',body:{keyId:key.id}});await keyPoolsLoad();await sdRenderLiveJobs();$('pool-message').textContent=videoLiveHelp(sdLiveConfiguration);}catch(e){$('pool-message').textContent=e.message;move.disabled=false;}};actions.append(move);}
    const check=document.createElement('button');check.className='ghost';check.type='button';check.textContent='Periksa Koneksi';check.disabled=!key.enabled;
    check.addEventListener('click',async()=>{
     check.disabled=true;$('pool-message').textContent='Memeriksa koneksi AIIDE tanpa generate...';
     try{const result=await api('/api/key-pools/test',{method:'POST',body:{keyId:key.id}});
-     $('pool-message').textContent=result.state==='connected'?`Koneksi AIIDE terbaca. ${result.modelCount} model tersedia; ${result.matchingVideoModels.length} cocok dengan katalog video engine. Engine video siap bila key Video memiliki model yang cocok. Saldo dan keberhasilan generate belum diverifikasi.`:result.state==='rejected'?'Key ditolak atau tidak memiliki izin membaca katalog. Generate tetap nonaktif.':'Penyedia membatasi request. Tunggu sebelum memeriksa lagi; tidak ada generate baru.';
+     $('pool-message').textContent=result.state==='connected'?`Koneksi AIIDE terbaca. ${result.modelCount} model tersedia; ${result.matchingVideoModels.length} cocok dengan katalog video engine. Model akun: ${(result.modelIds||[]).join(', ')}. ${key.group==='creative'?'Key ini berada di Teks & Gambar; gunakan Pindahkan ke Video untuk routing video.':''} ${result.matchingVideoModels.length?'Profil video cocok; kesiapan mengikuti kelompok dan kuota.':'Profil video belum cocok; generate tetap terkunci.'} Saldo dan keberhasilan generate belum diverifikasi.`:result.state==='rejected'?'Key ditolak atau tidak memiliki izin membaca katalog. Generate tetap nonaktif.':'Penyedia membatasi request. Tunggu sebelum memeriksa lagi; tidak ada generate baru.';
     }catch(e){const message={KEY_CHECK_COOLDOWN:'Tunggu 30 detik sebelum memeriksa key yang sama.',KEY_CHECK_UNAVAILABLE:'Koneksi provider belum dapat diperiksa. Key tidak dinyatakan valid atau gagal.',KEY_CHECK_REDIRECT_REFUSED:'Penyedia mengalihkan alamat. Pemeriksaan dihentikan agar key tidak dikirim ke host lain.'};$('pool-message').textContent=message[e.message]||'Pemeriksaan belum berhasil. Tidak ada generate yang dijalankan.';}
     finally{check.disabled=!key.enabled;await sdRenderLiveJobs();}
    });actions.append(check);

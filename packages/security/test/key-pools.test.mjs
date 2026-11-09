@@ -38,3 +38,10 @@ test('invalid group, secret, and daily caps are rejected before storage',async()
   await assert.rejects(m.preview('image','aiide'),/INVALID_KEY_GROUP/);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('unused AIIDE key moves to video preserving encrypted secret, identity and limits',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'key-move-'));const file=join(dir,'pool.json');const manager=createEncryptedKeyPools({file,key:randomBytes(32)});
+ try{const first=await manager.add({group:'creative',provider:'aiide',label:'Move me',secret:'MOCK_MOVE_SECRET_012345',dailyLimit:7,priority:2});const before=JSON.parse(await readFile(file,'utf8')).items[0];const moved=await manager.moveToVideo(first.id);assert.equal(moved.id,first.id);assert.equal(moved.group,'video');assert.equal(moved.dailyLimit,7);assert.equal(moved.priority,2);assert.equal((await manager.preview('creative','aiide')).selected,null);assert.equal((await manager.preview('video','aiide')).selected.id,first.id);assert.deepEqual(JSON.parse(await readFile(file,'utf8')).items[0].secret,before.secret);assert.equal(await manager.getForInternalTask(first.id,'video','aiide'),'MOCK_MOVE_SECRET_012345');await assert.rejects(manager.moveToVideo(first.id),{code:'KEY_MOVE_NOT_ALLOWED'});
+ const used=await manager.add({group:'creative',provider:'aiide',label:'Used key',secret:'MOCK_USED_SECRET_012345'});await manager.reserveForInternalDispatch('creative','aiide');await assert.rejects(manager.moveToVideo(used.id),{code:'KEY_MOVE_NOT_ALLOWED'});
+ }finally{await rm(dir,{recursive:true,force:true});}
+});

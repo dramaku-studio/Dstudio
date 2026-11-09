@@ -1,3 +1,5 @@
+CP022 / v0.8.0: Integrasi model terbaru. Baca docs/CP021_INSTALL.md untuk instalasi dan docs/CP022_AIIDE_MODEL_PLAZA.md untuk dukungan model.
+
 CP021 / v0.7.0: BACA docs/CP021_INSTALL.md untuk instalasi dan aktivasi API terbaru.
 Catatan CP020 berikut hanya riwayat; penguncian OFF default di bawah telah diganti aktivasi key.
 

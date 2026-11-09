@@ -129,7 +129,7 @@ export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=proces
    if(req.method==='GET'&&p==='/api/project-package/export'){const data=await edit(()=>packages.export());const body=JSON.stringify(data);res.writeHead(200,{'content-type':'application/json; charset=utf-8','content-disposition':'attachment; filename=dramasaku-project.studio.json','content-length':Buffer.byteLength(body),...security});res.end(body);return;}
    if(req.method==='POST'&&p==='/api/project-package/preview')return send(200,packages.preview(await readJson(95_000_000)));
    if(req.method==='POST'&&p==='/api/project-package/import'){const input=await readJson(95_000_000);return send(200,await edit(()=>packages.import(input)));}
-   if(req.method==='GET'&&p==='/api/studio/status')return send(200,{version:'0.7.0',mode:'local_internal',tools:await localTools(),paidVideoEnabled:activation?(await activation.status()).ready:aiideVideoEnabled&&aiideVideoCapabilityVerified,paidTtsEnabled:ttsEnabled&&(ttsCapabilityVerified||aiideTtsCapabilityVerified),paidImageEnabled:false,readOnlyAiide:aiideReadOnlyEnabled,modelCount:aiideVideoCatalog().models.length,sharing:'portable_package',maxPackageMediaBytes:64*1024*1024,multiUser:false});
+   if(req.method==='GET'&&p==='/api/studio/status')return send(200,{version:'0.8.0',mode:'local_internal',tools:await localTools(),paidVideoEnabled:activation?(await activation.status()).ready:aiideVideoEnabled&&aiideVideoCapabilityVerified,paidTtsEnabled:ttsEnabled&&(ttsCapabilityVerified||aiideTtsCapabilityVerified),paidImageEnabled:false,readOnlyAiide:aiideReadOnlyEnabled,modelCount:aiideVideoCatalog().models.length,sharing:'portable_package',maxPackageMediaBytes:64*1024*1024,multiUser:false});
    if(req.method==='GET'&&p==='/api/aiide-video/status')return send(200,await aiideVideo.list());
    if(req.method==='POST'&&p==='/api/aiide-video/import')return send(201,{job:await aiideVideo.importTask(await readJson(3000))});
    if(req.method==='POST'&&p==='/api/aiide-video/submit')return send(201,{job:await aiideVideo.submit(await readJson(16000))});
@@ -174,6 +174,10 @@ export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=proces
    if(req.method==='POST'&&p==='/api/key-pools/test'){
      const body=await readJson(1000);if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).join(',')!=='keyId')return fail(422,'KEY_CHECK_INPUT_INVALID');
      const key=(await keyPools.list()).pools.find(p=>p.id==='video')?.keys.find(k=>k.id===body.keyId);return send(200,activation&&key?await activation.check(body.keyId,{fresh:true}):await keyConnection.test(body));
+   }
+   if(req.method==='POST'&&p==='/api/key-pools/move-to-video'){
+     const body=await readJson(1000);if(!body||Object.keys(body).join(',')!=='keyId')return fail(422,'KEY_CHECK_INPUT_INVALID');
+     const key=await keyPools.moveToVideo(body.keyId);return send(200,{key,connection:activation?await activation.check(key.id,{fresh:true}):null});
    }
    if(req.method==='POST'&&p==='/api/key-pools/policy'){
       const {group,strategy}=await readJson();return send(200,await keyPools.setPolicy(group,strategy));

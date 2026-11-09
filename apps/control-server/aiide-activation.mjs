@@ -21,7 +21,7 @@ export function createAiideActivation({keyPools,fetchImpl=fetch,clock=Date.now,t
   const cached=cache.get(selected.id);
   const result=cachedOnly?(cached&&clock()-cached.time<ttlMs?cached.result:{state:'unchecked',matchingVideoModels:[]}):await check(selected.id);
   const models=result.matchingVideoModels||[];
-  return {ready:result.state==='connected'&&models.length>0,state:result.state,keyId:selected.id,models};
+  return {ready:result.state==='connected'&&models.length>0,state:result.state==='connected'&&!models.length?'catalog_not_supported':result.state,keyId:selected.id,models,catalogModels:result.modelIds||[]};
  }
  async function authorize(keyId,model){
   const result=await check(keyId,{fresh:true});

@@ -1,8 +1,8 @@
-# Dramasaku Studio CP021 / v0.7.0
+# Dramasaku Studio CP022 / v0.8.0
 
 ## Instalasi per komputer
 1. Instal Node.js 24 LTS (22 juga diuji), Git, FFmpeg dan FFprobe. Pastikan `node --version`, `npm --version`, `ffmpeg -version`, `ffprobe -version` berjalan di terminal baru.
-2. Clone `https://github.com/warkai-id/dramasakustudio.git` lalu `cd dramasakustudio`. Repo privat: akun anggota tim harus diberi akses. Alternatif: unduh ZIP v0.7.0 dari Releases dan ekstrak.
+2. Clone `https://github.com/warkai-id/dramasakustudio.git` lalu `cd dramasakustudio`. Repo privat: akun anggota tim harus diberi akses. Alternatif: unduh ZIP v0.8.0 dari Releases dan ekstrak.
 3. Jalankan `npm run dev`. Mode console lokal tidak memerlukan npm install, Docker atau PostgreSQL.
 4. Buka http://127.0.0.1:4184 dan masukkan kode operator yang tercetak di terminal komputer itu. Terminal tetap berjalan; Ctrl+C untuk berhenti.
 
@@ -37,3 +37,5 @@ Satu operator per komputer. Ekspor/impor paket proyek `.studio.json` melalui men
 Sebelum upgrade, hentikan aplikasi dan cadangkan folder kerja secara privat. Untuk clone bersih gunakan `git pull --ff-only`; untuk ZIP ekstrak ke folder baru. Pindahkan `.local-private` hanya secara lokal jika memerlukan data lama, setelah backup; jangan menimpanya dengan data komputer lain. CP021 akan memeriksa ulang key tersimpan ketika status video dibuka. Gunakan STUDIO_OFFLINE=1 saat pertama membuka data lama bila ingin tetap terkunci.
 
 Generate gambar/TTS tetap OFF. UI Aragi tetap hitam dengan aksen putih/biru langit. Pengujian rilis memakai mock tanpa request generate berbayar; kompatibilitas akun, saldo dan hasil provider nyata belum diuji.
+
+Pembaruan CP022: enam model video tambahan mengikuti contoh Model Plaza. Key AIIDE yang salah masuk Teks & Gambar dan belum digunakan dapat dipindahkan melalui tombol Pindahkan ke Video, tanpa menyalin secret. Model akun ditampilkan saat Periksa Koneksi. Dukungan parameter konservatif dijelaskan di CP022_AIIDE_MODEL_PLAZA.md.

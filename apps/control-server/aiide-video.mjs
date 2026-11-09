@@ -31,7 +31,7 @@ export function createAiideVideoEngine({root,keyPool,fetchImpl=fetch,enabled=fal
  const ready=()=>{if(!initialized)throw bad('AIIDE_NOT_INITIALIZED',503);};
  const find=id=>{if(!jobId.test(id||''))throw bad('AIIDE_JOB_NOT_FOUND',404);const j=jobs.find(x=>x.id===id);if(!j)throw bad('AIIDE_JOB_NOT_FOUND',404);return j;};
  async function save(){const tmp=join(folder,`.aiide-${randomBytes(8).toString('hex')}.tmp`);await writeFile(tmp,JSON.stringify({version:1,jobs}),{flag:'wx',mode:0o600});await rename(tmp,index);}
- async function adapter(j){const secret=await keyPool.getForInternalTask(j.keyId,'video','aiide');return createAiideVideoAdapter({apiKey:secret,fetchImpl,networkAllowed:enabled||!!activation||readOnlyEnabled});}
+ async function adapter(j){const secret=await keyPool.getForInternalTask(j.keyId,'video','aiide');return createAiideVideoAdapter({apiKey:secret,modelId:j.source==='imported'?null:j.model||null,fetchImpl,networkAllowed:enabled||!!activation||readOnlyEnabled});}
  async function accounts(){const pool=await keyPool.list();return pool.pools.find(p=>p.id==='video')?.keys.filter(k=>k.provider==='aiide'&&k.enabled)||[];}
  async function download(j,url){
   try{

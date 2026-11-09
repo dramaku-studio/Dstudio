@@ -6,7 +6,7 @@ export async function testAiideLocally(input,assets){
  const plan=compileAiideRequest(input,id=>assets.resolveAsset(id));
  const fixturePlan=compileAiideRequest(input,id=>({...assets.resolveAsset(id),providerReference:null}),{mockReferences:true});
  const calls=[];
- const adapter=createAiideVideoAdapter({apiKey:'local-contract-fixture-NOT-A-KEY',networkAllowed:true,fetchImpl:async(url,options)=>{
+ const adapter=createAiideVideoAdapter({apiKey:'local-contract-fixture-NOT-A-KEY',modelId:plan.model,networkAllowed:true,fetchImpl:async(url,options)=>{
   calls.push({method:options.method,url});
   if(options.method==='POST')return Response.json({task_id:'local-contract-test-0001',status:'SUBMITTED'});
   return Response.json({data:{status:'SUCCESS',data:{status:'succeeded',content:{video_url:'https://contract-fixture.example/sample.mp4'}}}});

@@ -15,7 +15,7 @@ test('read-only key verification uses a fixed GET endpoint and does not leak pro
   calls++;assert.equal(url,'https://www.aiide.com/v1/models');assert.equal(options.method,'GET');assert.equal(options.redirect,'manual');assert.equal(options.headers.authorization,`Bearer ${secret}`);assert.equal(options.body,undefined);
   return Response.json({data:[{id:'doubao-seedance-2-0-260128'},{id:'some-other-model'}],secretEcho:secret});
  }});
- const result=await tester.test({keyId:id});assert.equal(result.state,'connected');assert.equal(result.modelCount,2);assert.deepEqual(result.matchingVideoModels,['doubao-seedance-2-0-260128']);assert.equal(result.generationCalls,0);assert(!JSON.stringify(result).includes(secret));
+ const result=await tester.test({keyId:id});assert.equal(result.state,'connected');assert.equal(result.modelCount,2);assert.deepEqual(result.modelIds,['doubao-seedance-2-0-260128','some-other-model']);assert.deepEqual(result.matchingVideoModels,['doubao-seedance-2-0-260128']);assert.equal(result.generationCalls,0);assert(!JSON.stringify(result).includes(secret));
  await assert.rejects(tester.test({keyId:id}),{code:'KEY_CHECK_COOLDOWN'});assert.equal(calls,1);
  now+=30000;assert.equal((await tester.test({keyId:id})).state,'connected');assert.equal(calls,2);
 });
@@ -79,3 +79,5 @@ test('local HTTP: automatic key activation, restart validation and no paid POST'
   assert.equal((await request('/api/aiide-video/submit','POST',{input:{}})).status,403);assert.equal(providerCalls,2);
  }finally{if(app.server.listening)await new Promise(r=>app.server.close(r));await rm(root,{recursive:true,force:true});}
 });
+
+test('catalog model IDs cannot echo credentials or inject markup',async()=>{for(const id of [secret,'<script>alert(1)</script>']){const checker=createProviderConnectionTester({keyPools:pools(),fetchImpl:async()=>Response.json({data:[{id}]})});await assert.rejects(checker.test({keyId:'a'.repeat(24)}),{code:'KEY_CHECK_INVALID_RESPONSE'});}});

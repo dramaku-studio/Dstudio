@@ -5,6 +5,7 @@
 import {createHash} from 'node:crypto';
 import {isIP} from 'node:net';
 export const AIIDE_ORIGIN='https://www.aiide.com';
+export const AIIDE_MODEL_ORIGIN='https://api.aiide.com';
 export const AIIDE_MODES=Object.freeze([
  {id:'text_to_video',label:'Text → Video'},
  {id:'image_to_video',label:'Image → Video'},
@@ -16,6 +17,22 @@ export const AIIDE_MODES=Object.freeze([
 const ratios=['16:9','9:16','1:1','4:3','3:4'];
 const entry=(id,label,family,modes,extra={})=>Object.freeze({id,label,family,modes,provider:'aiide',minDuration:3,maxDuration:15,durationStep:1,supportsAutoDuration:false,resolutions:['720p','1080p'],ratioOptions:ratios,maxImages:0,maxVideos:0,maxAudios:0,supportsAudio:false,supportsWatermark:true,supportsSeed:false,supportsDraft:false,...extra});
 export const AIIDE_MODELS=Object.freeze([
+ // Exact model IDs and metadata fields from AIIDE Model Plaza examples, 2026-11-09.
+ // Keep non-Mini duration/resolution at the documented example until broader limits are verified.
+ ...[
+  ['dreamina-seedance-2-0-fast-hc','Dreamina Seedance 2.0 Fast'],
+  ['dreamina-seedance-2-0-hc','Dreamina Seedance 2.0'],
+  ['dreamina-seedance-2-0-mini-hc','Dreamina Seedance 2.0 Mini'],
+  ['dreamina-seedance-2-5-hc','Dreamina Seedance 2.5'],
+  ['doubao-seedance-2-0-mini-260615','Doubao Seedance 2.0 Mini'],
+  ['doubao-seedance-2-5-260628','Doubao Seedance 2.5']
+ ].map(([id,label])=>entry(id,label,'seedance',['text_to_video','image_to_video','first_last','reference'],{
+  origin:AIIDE_MODEL_ORIGIN,minDuration:id.includes('mini')?4:5,maxDuration:id.includes('mini')?15:5,
+  resolutions:id.includes('mini')?['480p','720p']:['480p'],maxImages:9,maxVideos:3,maxAudios:3,
+  supportsAudio:true,ratioOptions:[...ratios,'21:9'],sources:['464722026e0','9241613m0'],
+  documentationUrls:[`https://www.aiide.com/en/pricing/${id}`],
+  note:'Profil dari contoh resmi AIIDE Model Plaza. Batas lokal konservatif; hasil generate nyata belum diuji.'
+ })),
  ...['','-fast'].map(s=>entry(`doubao-seedance-2-0${s}-260128`,`Seedance 2.0${s?' Fast':''}`,'seedance',['text_to_video','image_to_video','first_last','reference'],{minDuration:4,maxImages:9,maxVideos:3,maxAudios:3,supportsAudio:true,resolutions:['provider_default'],ratioOptions:[...ratios,'21:9'],sources:['464722026e0','9241613m0'],note:'Resolusi mengikuti provider. Frame awal/akhir memakai metadata yang didokumentasikan AIIDE. Batas lokal konservatif; belum diuji berbayar.'})),
  entry('happyhorse-1.0-t2v','Happyhorse · Teks','happyhorse',['text_to_video'],{sources:['464722017e0']}),
  entry('happyhorse-1.0-i2v','Happyhorse · Gambar awal','happyhorse',['image_to_video'],{maxImages:1,sources:['464722018e0']}),
@@ -24,7 +41,7 @@ export const AIIDE_MODELS=Object.freeze([
  ...['fast','pro'].map(s=>entry(`sora-v3-${s}`,`Seed-2.0 · Sora-format ${s}`,'sora',['text_to_video','reference'],{minDuration:5,resolutions:['480p','720p'],maxImages:4,maxVideos:3,ratioOptions:[...ratios,'21:9'],supportsWatermark:false,sources:['464722031e0','464722032e0'],note:'Nama model pada endpoint AIIDE adalah sora-v3; keluarga di dokumentasi AIIDE: Seed-2.0 Special Price.'})),
  ...[false,true].flatMap(ref=>[4,6,8].map(n=>entry(`gemini-veo-3.1-generate-preview${ref?'-ref':''}-${n}s`,`Veo 3.1${ref?' Reference':''} · ${n}s`,'veo',['text_to_video','reference'],{minDuration:n,maxDuration:n,maxImages:ref?3:2,ratioOptions:['16:9','9:16'],supportsWatermark:false,sources:['464722028e0','464722029e0']})))
 ]);
-export function aiideVideoCatalog(){return {provider:'aiide',status:'local_contract_test',paidCallsEnabled:false,liveVerified:false,verifiedAsOf:'2026-11-08',promptMaxChars:4000,models:AIIDE_MODELS,modes:AIIDE_MODES,aspectRatioPresets:[...ratios,'21:9'].map(id=>({id,label:id,native:true})),sourceUrls:['https://aiide.apifox.cn/english/llms.txt'],unsupportedReason:'Video Extend belum memiliki kontrak AIIDE terverifikasi. Mini/2.5 tidak diaktifkan hanya karena tercantum pada API aset.'};}
+export function aiideVideoCatalog(){return {provider:'aiide',status:'local_contract_test',paidCallsEnabled:false,liveVerified:false,verifiedAsOf:'2026-11-08',promptMaxChars:4000,models:AIIDE_MODELS,modes:AIIDE_MODES,aspectRatioPresets:[...ratios,'21:9'].map(id=>({id,label:id,native:true})),sourceUrls:['https://aiide.apifox.cn/english/llms.txt'],unsupportedReason:'Video Extend belum memiliki kontrak AIIDE terverifikasi. Edit/Extend 2.5 belum diaktifkan karena contoh payload khusus belum diverifikasi.'};}
 const bad=(code)=>{throw Object.assign(new Error(code),{code,status:422});};
 const sha=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 /** Store references only; never fetch a client-supplied URL. */
@@ -86,7 +103,7 @@ export function compileAiideRequest(input,resolveAsset=()=>null,{forDispatch=fal
  let payload={model:model.id,prompt},path='/v1/video/generations';
  if(model.family==='seedance'){
   const content=resolved.filter(a=>a.role.startsWith('reference_')).map(a=>({type:a.kind+'_url',[a.kind+'_url']:{url:a.url},role:a.role}));
-  payload.metadata={content,generate_audio:input.generateAudio??true,ratio,duration,watermark:input.watermark??false};
+  payload.metadata={...(resolution==='provider_default'?{}:{resolution}),content,generate_audio:input.generateAudio??true,ratio,duration,watermark:input.watermark??false};
   if(roles.first_frame)payload.metadata.first_frame_image=byRole('first_frame')[0];
   if(roles.last_frame)payload.metadata.last_frame_image=byRole('last_frame')[0];
  }else if(model.family==='happyhorse'){
@@ -103,5 +120,5 @@ export function compileAiideRequest(input,resolveAsset=()=>null,{forDispatch=fal
  }
  const normalizedInput={provider:'aiide',model:model.id,mode:input.mode,prompt,promptLanguage:language,ratio,resolution,duration,generateAudio:model.supportsAudio?(input.generateAudio??true):false,watermark:model.supportsWatermark?(input.watermark??false):false,draft:false,assets:refs.map(r=>({assetId:r.assetId,role:r.role}))};
  const contract='aiide-public-2026-11-08';
- return {provider:'aiide',contract,model:model.id,mode:input.mode,input:normalizedInput,endpoint:AIIDE_ORIGIN+path,payload,requestHash:sha({contract,payload,assets:resolved.map(a=>({id:a.assetId,sha:a.sha256}))}),attachmentCount:refs.length,missingReferences:missing,status:missing.length?'prepared_local_needs_reference':'prepared_local',dispatchable:false,paidCallsEnabled:false,liveVerified:false,warnings:[...(missing.length?['LOCAL_ASSETS_NEED_PUBLIC_REFERENCE']:[]),'PAID_GENERATION_OFF','LIVE_ACCOUNT_UNVERIFIED'],sourceUrls:model.sources.map(id=>`https://aiide.apifox.cn/english/${id}`)};
+ return {provider:'aiide',contract,model:model.id,mode:input.mode,input:normalizedInput,endpoint:(model.origin||AIIDE_ORIGIN)+path,payload,requestHash:sha({contract,payload,assets:resolved.map(a=>({id:a.assetId,sha:a.sha256}))}),attachmentCount:refs.length,missingReferences:missing,status:missing.length?'prepared_local_needs_reference':'prepared_local',dispatchable:false,paidCallsEnabled:false,liveVerified:false,warnings:[...(missing.length?['LOCAL_ASSETS_NEED_PUBLIC_REFERENCE']:[]),'PAID_GENERATION_OFF','LIVE_ACCOUNT_UNVERIFIED'],sourceUrls:[...(model.documentationUrls||[]),...model.sources.map(id=>`https://aiide.apifox.cn/english/${id}`)]};
 }
