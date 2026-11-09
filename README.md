@@ -1,4 +1,4 @@
-# Dramasaku Studio — CP020 Lokal Internal (0.6.0)
+# Dramasaku Studio — CP021 AIIDE Auto Activation (0.7.0)
 
 Untuk tim yang bekerja di komputer masing-masing dan bertukar berkas proyek.
 Jalankan `npm run dev`, buka `http://127.0.0.1:4184`, lalu masukkan kode akses dari terminal sendiri. Node.js 22/24 dan FFmpeg + FFprobe di PATH diperlukan. Mode lokal tidak memerlukan npm install atau PostgreSQL.
@@ -10,10 +10,10 @@ Baca [MULAI_DI_SINI.txt](MULAI_DI_SINI.txt) untuk alur kerja, instalasi, upgrade
 - Persetujuan: review aset mengikuti versi cerita. Identitas peninjau adalah catatan operator lokal.
 - Film: susun/trim gambar dan video, pilih audio, render MP4 dengan FFmpeg. Hasil adalah edit media lokal.
 - Paket Tim: cerita, media, draf, susunan, dan review dapat dibuka di Dramasaku maupun Aragi. Kunci API dan alamat provider tidak ikut.
-- Bootstrap CP020 mengunci semua generate berbayar OFF, termasuk bila flag live versi lama masih ada di environment. Tidak ada tombol aktivasi di UI.
+- Input key Video / AIIDE → pemeriksaan katalog otomatis → engine siap jika model didukung. Generate tetap memerlukan klik dan persetujuan biaya. Gunakan `STUDIO_OFFLINE=1` untuk mengunci generate. Baca [panduan CP021](docs/CP021_INSTALL.md).
 - Video Extend tetap tidak tersedia karena kontrak AIIDE belum ditemukan. Profil request sesuai dokumentasi; hasil dan akses akun live belum diverifikasi.
 
-Catatan checkpoint di bawah adalah riwayat versi lama dan tidak menggantikan panduan CP020.
+Catatan checkpoint di bawah adalah riwayat versi lama dan tidak menggantikan panduan CP021.
 
 ---
 

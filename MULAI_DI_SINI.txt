@@ -1,3 +1,6 @@
+CP021 / v0.7.0: BACA docs/CP021_INSTALL.md untuk instalasi dan aktivasi API terbaru.
+Catatan CP020 berikut hanya riwayat; penguncian OFF default di bawah telah diganti aktivasi key.
+
 Dramasaku Studio — CP020 Lokal Internal, versi 0.6.0
 8 November 2026
 

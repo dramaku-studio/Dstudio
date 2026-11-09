@@ -21,7 +21,7 @@ export function approvedAiideResultUrl(value,hosts=[]){
  if(u.protocol!=='https:'||u.username||u.password||u.port||u.hash||isIP(u.hostname)||u.hostname==='localhost'||u.hostname.endsWith('.local')||u.hostname.endsWith('.internal')||!known.includes(u.hostname.toLowerCase())||!/^\/[\w%/.,~+@!$&'()*;=:-]+$/i.test(u.pathname))throw bad('AIIDE_RESULT_HOST_NOT_APPROVED',409);
  return u;
 }
-export function createAiideVideoEngine({root,keyPool,fetchImpl=fetch,enabled=false,capabilityVerified=false,readOnlyEnabled=false,allowedMediaHosts=[],resolveAsset=()=>null,maxDaily=1,clock=today}={}){
+export function createAiideVideoEngine({root,keyPool,fetchImpl=fetch,enabled=false,capabilityVerified=false,activation=null,readOnlyEnabled=false,allowedMediaHosts=[],resolveAsset=()=>null,maxDaily=1,clock=today}={}){
  if(typeof root!=='string'||!root||!keyPool||typeof fetchImpl!=='function')throw bad('AIIDE_ENGINE_CONFIG_INVALID');
  if(!Number.isInteger(maxDaily)||maxDaily<1||maxDaily>5)throw bad('AIIDE_DAILY_LIMIT_INVALID');
  const folder=resolve(root),index=join(folder,'aiide-video-jobs.json');let jobs=[],initialized=false,chain=Promise.resolve();
@@ -31,7 +31,7 @@ export function createAiideVideoEngine({root,keyPool,fetchImpl=fetch,enabled=fal
  const ready=()=>{if(!initialized)throw bad('AIIDE_NOT_INITIALIZED',503);};
  const find=id=>{if(!jobId.test(id||''))throw bad('AIIDE_JOB_NOT_FOUND',404);const j=jobs.find(x=>x.id===id);if(!j)throw bad('AIIDE_JOB_NOT_FOUND',404);return j;};
  async function save(){const tmp=join(folder,`.aiide-${randomBytes(8).toString('hex')}.tmp`);await writeFile(tmp,JSON.stringify({version:1,jobs}),{flag:'wx',mode:0o600});await rename(tmp,index);}
- async function adapter(j){const secret=await keyPool.getForInternalTask(j.keyId,'video','aiide');return createAiideVideoAdapter({apiKey:secret,fetchImpl,networkAllowed:enabled||readOnlyEnabled});}
+ async function adapter(j){const secret=await keyPool.getForInternalTask(j.keyId,'video','aiide');return createAiideVideoAdapter({apiKey:secret,fetchImpl,networkAllowed:enabled||!!activation||readOnlyEnabled});}
  async function accounts(){const pool=await keyPool.list();return pool.pools.find(p=>p.id==='video')?.keys.filter(k=>k.provider==='aiide'&&k.enabled)||[];}
  async function download(j,url){
   try{
@@ -59,7 +59,7 @@ export function createAiideVideoEngine({root,keyPool,fetchImpl=fetch,enabled=fal
    }catch(e){if(e.code!=='ENOENT')throw e;await save();}
    initialized=true;
   },
-  async list(){ready();const pool=await keyPool.preview('video','aiide');const keys=await accounts();return {provider:'aiide',enabled,readOnlyEnabled,capabilityVerified,configured:keys.length>0,maxDaily,usedToday:jobs.filter(j=>j.source!=='imported'&&j.createdAt.slice(0,10)===clock()).length,autoRetry:false,costEstimate:'provider_quote_required',modelCompatibility:'AIIDE public contracts 2026-11-08; local tests only, live account unverified',availableAccounts:keys.map(k=>({id:k.id,label:k.label})),jobs:jobs.slice(-30).reverse().map(pub)};},
+  async list(){ready();const pool=await keyPool.preview('video','aiide');const keys=await accounts();const readiness=activation?await activation.status():null;return {provider:'aiide',enabled:readiness?readiness.ready:enabled,readOnlyEnabled,capabilityVerified,credentialVerified:readiness?.ready||false,activationState:readiness?.state||'manual',availableModels:readiness?.models||[],autoActivation:!!activation,configured:keys.length>0,maxDaily,usedToday:jobs.filter(j=>j.source!=='imported'&&j.createdAt.slice(0,10)===clock()).length,autoRetry:false,costEstimate:'provider_quote_required',modelCompatibility:'AIIDE public contracts 2026-11-08; local tests only, live account unverified',availableAccounts:keys.map(k=>({id:k.id,label:k.label})),jobs:jobs.slice(-30).reverse().map(pub)};},
   // Import a task already created on AIIDE. Only GET status and GET media; no billable POST.
   async importTask({providerTaskId,keyId}={}){ready();if(!readOnlyEnabled)throw bad('AIIDE_READ_ONLY_IMPORT_DISABLED',403);
    if(typeof providerTaskId!=='string'||!importedTaskId.test(providerTaskId))throw bad('AIIDE_TASK_ID_INVALID',422);
@@ -78,23 +78,24 @@ export function createAiideVideoEngine({root,keyPool,fetchImpl=fetch,enabled=fal
     return pub(j);
    });
   },
-  async submit({input,consent,expectedRequestHash}={}){ready();if(!enabled)throw bad('AIIDE_VIDEO_DISABLED',403);if(!capabilityVerified)throw bad('AIIDE_MODEL_PROFILE_UNVERIFIED',403);if(consent!=='I_ACCEPT_PROVIDER_CHARGES')throw bad('AIIDE_COST_CONSENT_REQUIRED',403);
+  async submit({input,consent,expectedRequestHash}={}){ready();if(!enabled&&!activation)throw bad('AIIDE_VIDEO_DISABLED',403);if(!activation&&!capabilityVerified)throw bad('AIIDE_MODEL_PROFILE_UNVERIFIED',403);if(consent!=='I_ACCEPT_PROVIDER_CHARGES')throw bad('AIIDE_COST_CONSENT_REQUIRED',403);
    const plan=compileAiideRequest(input,resolveAsset,{forDispatch:true});
    if(expectedRequestHash!==undefined&&expectedRequestHash!==plan.requestHash)throw bad('AIIDE_REQUEST_CHANGED',409);
    return serial(async()=>{if(jobs.filter(j=>j.source!=='imported'&&j.createdAt.slice(0,10)===clock()).length>=maxDaily)throw bad('AIIDE_ONE_JOB_PER_DAY',429);
     if(jobs.some(j=>j.source!=='imported'&&j.requestHash===plan.requestHash&&j.createdAt.slice(0,10)===clock()))throw bad('AIIDE_DUPLICATE_JOB',409);
     const check=await keyPool.preview('video','aiide');if(!check.selected)throw bad('AIIDE_NO_ACTIVE_KEY',409);
+    const reserved=activation?await keyPool.reserveForInternalDispatch('video','aiide',{authorize:key=>activation.authorize(key.id,plan.model)}):null;
     const now=new Date().toISOString();const job={id:randomBytes(12).toString('hex'),model:plan.model,mode:plan.mode,source:'local_generation',requestHash:plan.requestHash,createdAt:now,updatedAt:now,status:'submission_unknown'};
     jobs.push(job);await save(); // intent durable BEFORE paid call
     try{
-     const reserved=await keyPool.reserveForInternalDispatch('video','aiide');job.keyId=reserved.keyId;await save();
-     const a=createAiideVideoAdapter({apiKey:reserved.secret,fetchImpl,networkAllowed:enabled});
+     const dispatchKey=reserved||await keyPool.reserveForInternalDispatch('video','aiide');job.keyId=dispatchKey.keyId;await save();
+     const a=createAiideVideoAdapter({apiKey:dispatchKey.secret,fetchImpl,networkAllowed:enabled||!!activation});
      const r=await a.submit(plan);job.providerTaskId=r.providerTaskId;job.status='submitted';job.errorCode=null;
     }catch(e){job.status='submission_unknown';job.errorCode=e.code||'AIIDE_SUBMISSION_UNKNOWN';}
     job.updatedAt=new Date().toISOString();await save();return pub(job);
    });
   },
-  async check(id){ready();if(!enabled&&!readOnlyEnabled)throw bad('AIIDE_STATUS_CHECK_DISABLED',403);return serial(async()=>{
+  async check(id){ready();if(!enabled&&!activation&&!readOnlyEnabled)throw bad('AIIDE_STATUS_CHECK_DISABLED',403);return serial(async()=>{
    const j=find(id);if(j.status==='submission_unknown')throw bad('AIIDE_MANUAL_RECONCILIATION_REQUIRED',409);
    if(done.has(j.status))throw bad('AIIDE_JOB_NOT_POLLABLE',409);
    if(!j.providerTaskId)throw bad('AIIDE_TASK_ID_MISSING',409);

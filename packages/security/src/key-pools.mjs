@@ -114,9 +114,10 @@ export function createEncryptedKeyPools({file,key,clock=today}={}){
      return decode(item.id,item.secret);
    },
    // Server-only hook. DO NOT expose as a UI endpoint. Must be backed by DB transaction + vendor policies before paid use.
-   async reserveForInternalDispatch(group,provider){validGroup(group);validProvider(provider);
+   async reserveForInternalDispatch(group,provider,{authorize}={}){validGroup(group);validProvider(provider);
      return serialize(async()=>{const data=await read(),day=clock(),item=choose(data,group,provider,day);
        if(!item)throw bad('NO_AVAILABLE_KEY');
+       if(authorize)await authorize(mask(item,day));
        if(item.usageDay!==day){item.usedToday=0;item.usageDay=day;}
        item.usedToday+=1;
        if(data.policies[group]==='round_robin'){data.cursor[group]??={};data.cursor[group][provider]=(data.cursor[group][provider]||0)+1;}

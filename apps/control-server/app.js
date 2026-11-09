@@ -52,9 +52,9 @@ function sdRevise(){const model=sdCurrent();if(!model)return;
  $('sd-draft').disabled=true;$('sd-draft').checked=false;$('sd-seed').disabled=true;$('sd-seed').value='';
  $('sd-audio').disabled=!model.supportsAudio;if(!model.supportsAudio)$('sd-audio').checked=false;
  $('sd-watermark').disabled=!model.supportsWatermark;if(!model.supportsWatermark)$('sd-watermark').checked=false;
- sdText('sd-modelhint',`${model.label} · ${model.note||'Profil request dari dokumentasi AIIDE.'} Generate berbayar OFF pada sesi lokal.`);
+ sdText('sd-modelhint',`${model.label} · ${model.note||'Profil request dari dokumentasi AIIDE.'} Generate baru memerlukan key valid dan persetujuan biaya.`);
  $('sd-reference-section').hidden=mode==='text_to_video';
- sdRenderAssets();
+ sdRenderAssets();$('sd-live').disabled=!sdCanGenerate(sdLiveConfiguration);
 }
 const sdRoles={image:[['first_frame','First frame'],['last_frame','Last frame'],['reference_image','Reference image']],video:[['reference_video','Reference video']],audio:[['reference_audio','Reference audio']]};
 function sdRenderAssets(){const target=$('sd-assets');target.replaceChildren();if(!sdAssets.length){const p=document.createElement('p');p.className='hint';p.textContent='Belum ada referensi. Tambahkan gambar, video, atau audio lokal.';target.append(p);return;}
@@ -81,13 +81,15 @@ function sdRenderAssets(){const target=$('sd-assets');target.replaceChildren();i
   target.append(row);
  }
 }
+function sdCanGenerate(live){return !!(live?.enabled&&(live.capabilityVerified||live.credentialVerified)&&live.configured&&live.usedToday<live.maxDaily&&(!live.autoActivation||live.availableModels.includes($('sd-model').value)));}
 function videoLiveHelp(live){
- if(!live?.enabled)return 'Generate AI berbayar OFF. Mode, draf, dan Uji Mode Lokal dapat digunakan tanpa API key.';
+ if(!live?.enabled)return live?.autoActivation?'Engine belum siap ('+live.activationState+'). Tambahkan key Video / AIIDE yang valid dan memiliki model video. Uji Mode Lokal tetap tersedia.':'Mode offline: generate berbayar OFF.';
  if(!live?.configured)return 'Akun AIIDE belum terhubung. Periksa Kunci API sebelum membuat video.';
  if(!live.enabled)return 'Video baru belum diaktifkan. Video lama tetap bisa diambil tanpa membuat ulang.';
- if(!live.capabilityVerified)return 'Izin uji model belum diaktifkan. Konfirmasi model dan biaya pada akun AIIDE dahulu.';
+ if(!(live.capabilityVerified||live.credentialVerified))return 'Izin uji model belum diaktifkan. Konfirmasi model dan biaya pada akun AIIDE dahulu.';
  if(live.usedToday>=live.maxDaily)return 'Batas 1 generate per hari tercapai. Buka hasil yang sudah ada, jangan mengulang.';
- return 'Siap membuat 1 video melalui AIIDE. Konfirmasi biaya akan muncul sebelum mengirim.';
+ if(live.autoActivation&&!live.availableModels.includes($('sd-model').value))return 'Model ini tidak tersedia pada katalog key terpilih. Pilih model yang tersedia.';
+ return 'Key dan katalog siap. Saldo serta keberhasilan generate belum diverifikasi. Konfirmasi biaya diperlukan sebelum mengirim.';
 }
 async function sdLiveStatus(){return api(sdLiveBase()+'/status');}
 let sdPollTimer=null,sdPollBusy=false,sdPollCount=0,sdPollFailures=0;
@@ -169,10 +171,10 @@ $('sd-upload-btn').addEventListener('click',async()=>{
 $('sd-preview').addEventListener('click',async()=>{try{await api('/api/aiide-video/preview',{method:'POST',body:sdInput()});sdText('sd-plan-status','Pengaturan sesuai untuk draf lokal. Tidak ada request provider.');}catch(e){sdText('sd-plan-status',e.message);}});
 $('sd-generate').addEventListener('click',async()=>{try{await api('/api/aiide-video/drafts',{method:'POST',body:sdInput()});await sdRefresh();sdText('sd-plan-status','Draf video tersimpan lengkap.');if(typeof internalReload==='function')await internalReload();}catch(e){sdText('sd-plan-status',studioError(e));}});
 $('sd-live').addEventListener('click',async()=>{
- const button=$('sd-live');button.disabled=true;
+ const button=$('sd-live');button.disabled=true;let submitError=null;
  try{
   const live=await sdLiveStatus();sdLiveConfiguration=live;
-  if(!live?.enabled||!live.capabilityVerified||!live.configured||live.usedToday>=live.maxDaily){sdText('sd-live-status',videoLiveHelp(live));return;}
+  if(!sdCanGenerate(live)){sdText('sd-live-status',videoLiveHelp(live));return;}
   const plan=await api('/api/aiide-video/preview',{method:'POST',body:sdInput()});
   if(plan.missingReferences.length){sdText('sd-live-status','Referensi masih lokal. Siapkan alamat yang dapat dibaca provider sebelum jalur live.');return;}
   if(!confirm('Kirim SATU permintaan video berbayar melalui AIIDE? Biaya mengikuti penyedia. Jika status tidak pasti, jangan mengirim ulang.'))return;
@@ -180,8 +182,8 @@ $('sd-live').addEventListener('click',async()=>{
   sdPollCount=0;sdPollFailures=0;
   sdText('sd-live-status',res.job.status==='submission_unknown'?'Pengiriman belum pasti. Cek Task Logs AIIDE sebelum mengulang.':'Video sedang dibuat. Hasil akan muncul otomatis di kanan.');
   await sdRenderLiveJobs();
- }catch(e){sdText('sd-live-status',`Belum dapat membuat video: ${sdLiveError(e.message)}`);}
- finally{button.disabled=!sdLiveConfiguration?.enabled;}
+ }catch(e){submitError=`Belum dapat membuat video: ${sdLiveError(e.message)}`;}
+ finally{await sdRenderLiveJobs().catch(()=>{button.disabled=true;});if(submitError)sdText('sd-live-status',submitError);}
 });
 $('sd-import-button').addEventListener('click',async()=>{
  const button=$('sd-import-button'),providerTaskId=$('sd-import-task').value.trim(),keyId=$('sd-import-account').value;
@@ -206,7 +208,7 @@ function sdShowPlayer(job){
 }
 async function sdRenderLiveJobs(){
  const data=await sdLiveStatus();sdLiveConfiguration=data;
- $('sd-live').disabled=!(data.enabled&&data.capabilityVerified&&data.configured&&data.usedToday<data.maxDaily);
+ $('sd-live').disabled=!sdCanGenerate(data);
  const recovery=$('sd-aiide-recovery');recovery.hidden=!sdIsAiide();
  const account=$('sd-import-account'),selected=account.value;account.replaceChildren();
  const options=data.availableAccounts||[];
@@ -392,17 +394,17 @@ async function keyPoolsLoad(){
   const actions=document.createElement('div');actions.className='key-item-actions';
   const pill=document.createElement('span');pill.className='pill subtle';pill.textContent=key.enabled?'Aktif':'Nonaktif';
   const toggle=document.createElement('button');toggle.className='ghost';toggle.type='button';toggle.textContent=key.enabled?'Matikan':'Aktifkan';
-  toggle.addEventListener('click',async()=>{try{await api('/api/key-pools/update',{method:'POST',body:{id:key.id,enabled:!key.enabled}});await keyPoolsLoad();}catch(e){$('pool-message').textContent=e.message;}});
+  toggle.addEventListener('click',async()=>{try{await api('/api/key-pools/update',{method:'POST',body:{id:key.id,enabled:!key.enabled}});await keyPoolsLoad();await sdRenderLiveJobs();}catch(e){$('pool-message').textContent=e.message;}});
   const remove=document.createElement('button');remove.className='ghost danger';remove.type='button';remove.textContent='Hapus';
-  remove.addEventListener('click',async()=>{if(!confirm(`Hapus kunci "${key.label}"?`))return;try{await api(`/api/key-pools/${key.id}`,{method:'DELETE'});await keyPoolsLoad();}catch(e){$('pool-message').textContent=e.message;}});
+  remove.addEventListener('click',async()=>{if(!confirm(`Hapus kunci "${key.label}"?`))return;try{await api(`/api/key-pools/${key.id}`,{method:'DELETE'});await keyPoolsLoad();await sdRenderLiveJobs();}catch(e){$('pool-message').textContent=e.message;}});
   if(key.provider==='aiide'){
    const check=document.createElement('button');check.className='ghost';check.type='button';check.textContent='Periksa Koneksi';check.disabled=!key.enabled;
    check.addEventListener('click',async()=>{
     check.disabled=true;$('pool-message').textContent='Memeriksa koneksi AIIDE tanpa generate...';
     try{const result=await api('/api/key-pools/test',{method:'POST',body:{keyId:key.id}});
-     $('pool-message').textContent=result.state==='connected'?`Koneksi AIIDE terbaca. ${result.modelCount} model tersedia; ${result.matchingVideoModels.length} cocok dengan katalog video engine. Cek ini tidak mengaktifkan generate berbayar; kontrak video belum diuji.`:result.state==='rejected'?'Key ditolak atau tidak memiliki izin membaca katalog. Generate tetap nonaktif.':'Penyedia membatasi request. Tunggu sebelum memeriksa lagi; tidak ada generate baru.';
+     $('pool-message').textContent=result.state==='connected'?`Koneksi AIIDE terbaca. ${result.modelCount} model tersedia; ${result.matchingVideoModels.length} cocok dengan katalog video engine. Engine video siap bila key Video memiliki model yang cocok. Saldo dan keberhasilan generate belum diverifikasi.`:result.state==='rejected'?'Key ditolak atau tidak memiliki izin membaca katalog. Generate tetap nonaktif.':'Penyedia membatasi request. Tunggu sebelum memeriksa lagi; tidak ada generate baru.';
     }catch(e){const message={KEY_CHECK_COOLDOWN:'Tunggu 30 detik sebelum memeriksa key yang sama.',KEY_CHECK_UNAVAILABLE:'Koneksi provider belum dapat diperiksa. Key tidak dinyatakan valid atau gagal.',KEY_CHECK_REDIRECT_REFUSED:'Penyedia mengalihkan alamat. Pemeriksaan dihentikan agar key tidak dikirim ke host lain.'};$('pool-message').textContent=message[e.message]||'Pemeriksaan belum berhasil. Tidak ada generate yang dijalankan.';}
-    finally{check.disabled=!key.enabled;}
+    finally{check.disabled=!key.enabled;await sdRenderLiveJobs();}
    });actions.append(check);
   }
   actions.append(pill,toggle,remove);card.append(info,actions);target.append(card);
@@ -412,15 +414,15 @@ async function keyPoolsLoad(){
  window.DramasakuLang?.apply();
 }
 $('keypool-form').addEventListener('submit',async(event)=>{
- event.preventDefault();const secret=$('pool-secret').value;
+ event.preventDefault();const submitButton=event.currentTarget.querySelector('button[type=submit]');if(submitButton.disabled)return;submitButton.disabled=true;$('pool-message').textContent='Menyimpan dan memeriksa key...';const secret=$('pool-secret').value;
  const body={group:$('pool-group').value,provider:$('pool-provider').value,
    label:$('pool-label').value.trim(),secret,dailyLimit:Number($('pool-limit').value),priority:Number($('pool-priority').value),enabled:true};
  $('pool-secret').value='';
  try{await api('/api/key-pools',{method:'POST',body});$('pool-message').textContent='Kunci berhasil ditambahkan dan disimpan aman.';
-  $('pool-label').value='';await keyPoolsLoad();
- }catch(e){$('pool-message').textContent=`Gagal menyimpan: ${e.message}`;}
+  $('pool-label').value='';await keyPoolsLoad();await sdRenderLiveJobs();$('pool-message').textContent=videoLiveHelp(sdLiveConfiguration);
+ }catch(e){$('pool-message').textContent=`Gagal menyimpan: ${e.message}`;}finally{submitButton.disabled=false;}
 });
-$('pool-group').addEventListener('change',()=>{$('pool-provider').value=$('pool-group').value==='video'?'volcengine':'aiide';});
+$('pool-group').addEventListener('change',()=>{$('pool-provider').value='aiide';});
 $('pool-preview-group').addEventListener('change',()=>{
  $('pool-preview-provider').value=$('pool-preview-group').value==='video'?'volcengine':'aiide';
  const policy=keyPoolData?.pools.find(p=>p.id===$('pool-preview-group').value);

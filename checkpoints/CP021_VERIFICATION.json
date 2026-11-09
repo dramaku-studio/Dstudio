@@ -1,0 +1,17 @@
+{
+  "checkpoint": "CP021",
+  "version": "0.7.0",
+  "tests": 203,
+  "pass": 201,
+  "fail": 0,
+  "skipped": 2,
+  "skippedReason": "PostgreSQL integration runs in GitHub CI",
+  "realPaidGenerationCalls": 0,
+  "providerTests": "injected local mocks only",
+  "browserSmoke": "saved fake key automatically enables video button; unsupported model disabled; no generate clicked",
+  "limitations": [
+    "Real account credit, generation entitlement and output unverified",
+    "One local operator per computer",
+    "Reference URLs and result CDN hosts require operator configuration"
+  ]
+}

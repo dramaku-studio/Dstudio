@@ -36,7 +36,7 @@ function internalPaintMedia(){
 function internalSelectMode(mode){
  const model=sdCurrent()?.modes.includes(mode)?sdCurrent():sdCatalog?.models.find(m=>m.modes.includes(mode));
  if(!model){$('motion-status').textContent='Mode ini belum didokumentasikan AIIDE.';return false;}
- $('sd-model').value=model.id;sdRevise();$('sd-mode').value=mode;sdRevise();openView('video-studio');sdText('sd-plan-status','Siapkan referensi, lalu Uji Mode Lokal. Generate berbayar OFF.');return true;
+ $('sd-model').value=model.id;sdRevise();$('sd-mode').value=mode;sdRevise();openView('video-studio');sdText('sd-plan-status','Siapkan referensi, lalu Uji Mode Lokal. Generate AI memerlukan key valid dan persetujuan biaya.');return true;
 }
 function internalPaintBriefs(){
  for(const [kind,id,target] of [['image','image-briefs','image-prompt'],['motion','motion-briefs','motion-prompt']]){

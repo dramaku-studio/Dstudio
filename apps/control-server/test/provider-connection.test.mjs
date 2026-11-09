@@ -58,3 +58,24 @@ test('local HTTP: encrypted key survives server restart, feeds provider checker,
   assert.equal((await request('/api/aiide-video/submit','POST',{input:{},consent:'I_ACCEPT_PROVIDER_CHARGES'})).status,403);assert.equal(providerCalls,1);
  }finally{if(app.server.listening)await new Promise(r=>app.server.close(r));await rm(root,{recursive:true,force:true});}
 });
+
+test('local HTTP: automatic key activation, restart validation and no paid POST',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'ds-key-engine-')),vaultKey=randomBytes(32).toString('base64');
+ const port=35000+Math.floor(Math.random()*18000),origin=`http://127.0.0.1:${port}`;let providerCalls=0;
+ const config={aiideAutoActivate:true,aiideVideoFetchImpl:async()=>{throw Error('Paid network forbidden in HTTP readiness test');},port,adminToken:'local-key-engine-disposable-operator-token',vaultKey,vaultFile:join(root,'vault.enc'),keyTestFetchImpl:async(url,opts)=>{providerCalls++;assert.equal(opts.method,'GET');assert.equal(opts.headers.authorization,`Bearer ${secret}`);return Response.json({data:[{id:'doubao-seedance-2-0-260128'}]});}};
+ let app=createLocalConsole(config),cookie='',csrf='';
+ async function request(path,method='GET',body,withCsrf=true){const response=await fetch(origin+path,{method,headers:{...(cookie?{cookie}:{}),...(method==='POST'?{origin,'content-type':'application/json',...(withCsrf?{'x-dramasaku-csrf':csrf}:{})}: {})},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json(),headers:response.headers};}
+ async function login(){const result=await request('/api/login','POST',{token:config.adminToken});cookie=result.headers.get('set-cookie').split(';')[0];csrf=result.body.csrf;}
+ try{
+  await app.listen();assert.equal((await request('/api/key-pools/test','POST',{keyId:id})).status,401);await login();
+  const created=await request('/api/key-pools','POST',{group:'video',provider:'aiide',label:'Local engine key',secret});assert.equal(created.status,201);assert.equal(created.body.connection.state,'connected');assert.equal(providerCalls,1);assert.equal((await request('/api/health')).body.paidCallsEnabled,true);const keyId=created.body.key.id;
+  assert(!(await readFile(join(root,'key-pools.enc.json'),'utf8')).includes(secret));
+  await new Promise(r=>app.server.close(r));app=createLocalConsole(config);await app.listen();cookie='';csrf='';await login();
+  assert.equal((await request('/api/key-pools/test','POST',{keyId},false)).status,403);
+  assert.equal((await request('/api/key-pools/test','POST',{keyId,url:'https://attacker.invalid'})).status,422);
+  const checked=await request('/api/key-pools/test','POST',{keyId});assert.equal(checked.status,200);assert.equal(checked.body.state,'connected');assert(!JSON.stringify(checked.body).includes(secret));assert.equal(providerCalls,2);
+  assert.equal((await request('/api/aiide-video/status')).body.configured,true,'Video engine consumes this same saved key pool');
+  assert.equal((await request('/api/aiide-video/status')).body.enabled,true);
+  assert.equal((await request('/api/aiide-video/submit','POST',{input:{}})).status,403);assert.equal(providerCalls,2);
+ }finally{if(app.server.listening)await new Promise(r=>app.server.close(r));await rm(root,{recursive:true,force:true});}
+});

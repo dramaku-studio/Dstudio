@@ -13,6 +13,7 @@ import {createSeedanceLocalStore} from '../../packages/media/src/seedance-local-
 import {createLocalLiveEngine} from './local-live.mjs';
 import {createAiideVideoEngine} from './aiide-video.mjs';
 import {createLocalTtsEngine} from './tts-engine.mjs';
+import {createAiideActivation} from './aiide-activation.mjs';
 import {createProviderConnectionTester} from './provider-connection.mjs';
 import {aiideVideoCatalog,compileAiideRequest} from '../../packages/providers/src/aiide-video-plan.mjs';
 import {testAiideLocally} from './aiide-local-test.mjs';
@@ -21,16 +22,17 @@ import {createProjectPackages} from './project-package.mjs';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const dir=dirname(fileURLToPath(import.meta.url));
-export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=process.env.DRAMASAKU_LOCAL_ADMIN_TOKEN,vaultKey=process.env.DRAMASAKU_VAULT_KEY_B64,vaultFile=process.env.DRAMASAKU_VAULT_FILE||resolve(dir,'../../.local-private/credentials.enc.json'),demo=null,assetRoot,liveEnabled=false,capabilityVerified=false,liveFetchImpl=fetch,aiideVideoEnabled=false,aiideVideoCapabilityVerified=false,aiideReadOnlyEnabled=false,aiideVideoFetchImpl=fetch,aiideMediaHosts=[],ttsEnabled=false,ttsCapabilityVerified=false,aiideTtsCapabilityVerified=false,ttsFetchImpl=fetch,keyTestFetchImpl=fetch}={}){
+export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=process.env.DRAMASAKU_LOCAL_ADMIN_TOKEN,vaultKey=process.env.DRAMASAKU_VAULT_KEY_B64,vaultFile=process.env.DRAMASAKU_VAULT_FILE||resolve(dir,'../../.local-private/credentials.enc.json'),demo=null,assetRoot,liveEnabled=false,capabilityVerified=false,liveFetchImpl=fetch,aiideAutoActivate=false,aiideVideoEnabled=false,aiideVideoCapabilityVerified=false,aiideReadOnlyEnabled=false,aiideVideoFetchImpl=fetch,aiideMediaHosts=[],ttsEnabled=false,ttsCapabilityVerified=false,aiideTtsCapabilityVerified=false,ttsFetchImpl=fetch,keyTestFetchImpl=fetch}={}){
  if(!['127.0.0.1','::1'].includes(host))throw Error('Local operator console refuses public bind');
  if(typeof adminToken!=='string'||adminToken.length<20)throw Error('Set DRAMASAKU_LOCAL_ADMIN_TOKEN (20+ chars); not committed to repository');
  const vault=createEncryptedVault({file:vaultFile,key:vaultKey});
  const keyPools=createEncryptedKeyPools({file:resolve(dirname(vaultFile),'key-pools.enc.json'),key:vaultKey});
+ const activation=aiideAutoActivate?createAiideActivation({keyPools,fetchImpl:keyTestFetchImpl}):null;
  const keyConnection=createProviderConnectionTester({keyPools,fetchImpl:keyTestFetchImpl});
  const seedance=createSeedanceLocalStore({root:assetRoot||resolve(dirname(vaultFile),'seedance-assets')});
  const workspace=createWorkspaceStore({file:resolve(dirname(vaultFile),'creative-workspace.json')});
  const live=createLocalLiveEngine({root:resolve(dirname(vaultFile),'live-video'),loadApiKey:()=>vault.getForServerOnly('volcengine_las'),fetchImpl:liveFetchImpl,enabled:liveEnabled,capabilityVerified,maxDaily:1});
- const aiideVideo=createAiideVideoEngine({root:resolve(dirname(vaultFile),'aiide-video'),keyPool:keyPools,fetchImpl:aiideVideoFetchImpl,enabled:aiideVideoEnabled,capabilityVerified:aiideVideoCapabilityVerified,readOnlyEnabled:aiideReadOnlyEnabled,allowedMediaHosts:aiideMediaHosts,resolveAsset:id=>seedance.resolveAsset(id),maxDaily:1});
+ const aiideVideo=createAiideVideoEngine({root:resolve(dirname(vaultFile),'aiide-video'),keyPool:keyPools,activation,fetchImpl:aiideVideoFetchImpl,enabled:aiideVideoEnabled,capabilityVerified:aiideVideoCapabilityVerified,readOnlyEnabled:aiideReadOnlyEnabled,allowedMediaHosts:aiideMediaHosts,resolveAsset:id=>seedance.resolveAsset(id),maxDaily:1});
  const tts=createLocalTtsEngine({root:resolve(dirname(vaultFile),'tts-audio'),loadApiKey:slot=>vault.getForServerOnly(slot),fetchImpl:ttsFetchImpl,enabled:ttsEnabled,capabilityVerified:ttsCapabilityVerified,aiideCapabilityVerified:aiideTtsCapabilityVerified,maxDaily:1});
  const production=createProductionStore({root:resolve(dirname(vaultFile),'production'),workspace,assets:seedance});
  const packages=createProjectPackages({root:dirname(vaultFile),workspace,assets:seedance,production,tts});
@@ -69,9 +71,9 @@ export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=proces
    if(req.method==='GET'&&p==='/i18n.js'){res.writeHead(200,{'content-type':'text/javascript; charset=utf-8',...security});res.end(await readFile(join(dir,'i18n.js')));return;}
    if(req.method==='GET'&&p==='/internal.js'){res.writeHead(200,{'content-type':'text/javascript; charset=utf-8',...security});res.end(await readFile(join(dir,'internal.js')));return;}
    if(req.method==='GET'&&p==='/app.js'){res.writeHead(200,{'content-type':'text/javascript; charset=utf-8',...security});res.end(await readFile(join(dir,'app.js')));return;}
-   if(req.method==='GET'&&p==='/api/health')return send(200,{ok:true,mode:'local_operator',production:false,paidCallsEnabled:(liveEnabled&&capabilityVerified)||(aiideVideoEnabled&&aiideVideoCapabilityVerified)||(ttsEnabled&&(ttsCapabilityVerified||aiideTtsCapabilityVerified))});
+   if(req.method==='GET'&&p==='/api/health')return send(200,{ok:true,mode:'local_operator',production:false,paidCallsEnabled:(liveEnabled&&capabilityVerified)||(activation?(await activation.status({cachedOnly:true})).ready:(aiideVideoEnabled&&aiideVideoCapabilityVerified))||(ttsEnabled&&(ttsCapabilityVerified||aiideTtsCapabilityVerified))});
    const s=session(req);
-   if(req.method==='GET'&&p==='/api/session')return send(200,{authenticated:!!s,csrf:s?.csrf??null,offlineOnly:true});
+   if(req.method==='GET'&&p==='/api/session')return send(200,{authenticated:!!s,csrf:s?.csrf??null,offlineOnly:!aiideAutoActivate&&!aiideVideoEnabled&&!liveEnabled&&!ttsEnabled});
    if(req.method==='POST'&&p==='/api/login'){
      const a=failed.get('local')??{count:0,until:0};if(a.count>=5&&a.until>Date.now())return fail(429,'RATE_LIMITED');
      const body=await readJson();if(typeof body?.token!=='string'||denyKey(body.token,adminToken)){
@@ -127,7 +129,7 @@ export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=proces
    if(req.method==='GET'&&p==='/api/project-package/export'){const data=await edit(()=>packages.export());const body=JSON.stringify(data);res.writeHead(200,{'content-type':'application/json; charset=utf-8','content-disposition':'attachment; filename=dramasaku-project.studio.json','content-length':Buffer.byteLength(body),...security});res.end(body);return;}
    if(req.method==='POST'&&p==='/api/project-package/preview')return send(200,packages.preview(await readJson(95_000_000)));
    if(req.method==='POST'&&p==='/api/project-package/import'){const input=await readJson(95_000_000);return send(200,await edit(()=>packages.import(input)));}
-   if(req.method==='GET'&&p==='/api/studio/status')return send(200,{version:'0.6.0',mode:'local_internal',tools:await localTools(),paidVideoEnabled:aiideVideoEnabled&&aiideVideoCapabilityVerified,paidTtsEnabled:ttsEnabled&&(ttsCapabilityVerified||aiideTtsCapabilityVerified),paidImageEnabled:false,readOnlyAiide:aiideReadOnlyEnabled,modelCount:aiideVideoCatalog().models.length,sharing:'portable_package',maxPackageMediaBytes:64*1024*1024,multiUser:false});
+   if(req.method==='GET'&&p==='/api/studio/status')return send(200,{version:'0.7.0',mode:'local_internal',tools:await localTools(),paidVideoEnabled:activation?(await activation.status()).ready:aiideVideoEnabled&&aiideVideoCapabilityVerified,paidTtsEnabled:ttsEnabled&&(ttsCapabilityVerified||aiideTtsCapabilityVerified),paidImageEnabled:false,readOnlyAiide:aiideReadOnlyEnabled,modelCount:aiideVideoCatalog().models.length,sharing:'portable_package',maxPackageMediaBytes:64*1024*1024,multiUser:false});
    if(req.method==='GET'&&p==='/api/aiide-video/status')return send(200,await aiideVideo.list());
    if(req.method==='POST'&&p==='/api/aiide-video/import')return send(201,{job:await aiideVideo.importTask(await readJson(3000))});
    if(req.method==='POST'&&p==='/api/aiide-video/submit')return send(201,{job:await aiideVideo.submit(await readJson(16000))});
@@ -168,10 +170,10 @@ export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=proces
       const input=await readJson();const created=await seedance.createJob(input);return send(201,created);
    }
    if(req.method==='GET'&&p==='/api/key-pools')return send(200,await keyPools.list());
-   if(req.method==='POST'&&p==='/api/key-pools')return send(201,{key:await keyPools.add(await readJson())});
+   if(req.method==='POST'&&p==='/api/key-pools'){const key=await keyPools.add(await readJson());const connection=activation&&key.group==='video'&&key.provider==='aiide'?await activation.check(key.id):null;return send(201,{key,connection});}
    if(req.method==='POST'&&p==='/api/key-pools/test'){
      const body=await readJson(1000);if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).join(',')!=='keyId')return fail(422,'KEY_CHECK_INPUT_INVALID');
-     return send(200,await keyConnection.test(body));
+     const key=(await keyPools.list()).pools.find(p=>p.id==='video')?.keys.find(k=>k.id===body.keyId);return send(200,activation&&key?await activation.check(body.keyId,{fresh:true}):await keyConnection.test(body));
    }
    if(req.method==='POST'&&p==='/api/key-pools/policy'){
       const {group,strategy}=await readJson();return send(200,await keyPools.setPolicy(group,strategy));

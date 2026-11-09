@@ -19,8 +19,8 @@ async function secrets(){
 }
 const s=await secrets();const port=Number(process.env.PORT||4184);
 if(!Number.isInteger(port)||port<1024||port>65535)throw Error('PORT must be 1024..65535');
-// CP020 internal release is locked to local tests. Old environment flags cannot enable billing.
-const app=createLocalConsole({port,adminToken:s.token,vaultKey:s.key,vaultFile:resolve(root,'.local-private','credentials.enc.json'),liveEnabled:false,capabilityVerified:false,aiideVideoEnabled:false,aiideVideoCapabilityVerified:false,aiideReadOnlyEnabled:true,aiideMediaHosts:(process.env.DRAMASAKU_AIIDE_MEDIA_HOSTS||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean),ttsEnabled:false,ttsCapabilityVerified:false,aiideTtsCapabilityVerified:false});
+// CP021: validated AIIDE video credentials enable manual paid submission. Offline mode remains available.
+const app=createLocalConsole({port,adminToken:s.token,vaultKey:s.key,vaultFile:resolve(root,'.local-private','credentials.enc.json'),liveEnabled:false,capabilityVerified:false,aiideAutoActivate:process.env.STUDIO_OFFLINE!=='1',aiideVideoEnabled:false,aiideVideoCapabilityVerified:false,aiideReadOnlyEnabled:true,aiideMediaHosts:(process.env.DRAMASAKU_AIIDE_MEDIA_HOSTS||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean),ttsEnabled:false,ttsCapabilityVerified:false,aiideTtsCapabilityVerified:false});
 await app.listen();
 console.log('\nDRAMASAKU LOCAL OPERATOR CONSOLE (DEVELOPMENT ONLY)');
 console.log(`Open: http://127.0.0.1:${port}`);
@@ -28,6 +28,7 @@ console.log(`Operator token (use on your own machine only): ${s.token}`);
 console.log('Never share the token or API keys in chat, screenshots, or GitHub.');
 if(process.platform==='win32')console.warn('Windows: review NTFS permissions on .local-private (this console only binds to localhost).');
 console.log('Paid video pilot: '+((await app.live.list()).enabled && (await app.live.list()).capabilityVerified ? 'OPT-IN (1 submission/day; no auto retry)' : 'DISABLED (default)'));
-console.log('AIIDE video pilot: '+((await app.aiideVideo.list()).enabled?'OPT-IN (1 paid job/day; model contract verification required)':'DISABLED (default)'));
-console.log('Voice TTS: DISABLED — CP020 local release lock');
+console.log('AIIDE auto activation: '+(process.env.STUDIO_OFFLINE==='1'?'OFFLINE':'valid key + catalog required; consent per generate'));
+console.log('AIIDE: check readiness in Video Studio; no generation occurs at startup.');
+console.log('Voice TTS: DISABLED — local release lock');
 console.log('Publishing remains disabled. Use Ctrl+C to stop.\n');
