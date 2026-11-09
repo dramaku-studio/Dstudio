@@ -1,0 +1,26 @@
+{
+  "name": "dramasaku-studio",
+  "version": "0.6.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "node --test scripts/*.test.mjs packages/domain/test/*.test.mjs packages/db/test/*.test.mjs packages/providers/test/*.test.mjs packages/media/test/*.test.mjs apps/worker/test/*.test.mjs packages/security/test/*.test.mjs apps/control-server/test/*.test.mjs",
+    "check": "npm test",
+    "dev": "npm run console:start",
+    "worker": "node apps/worker/index.mjs",
+    "db:migrate": "node packages/db/src/migrate.mjs",
+    "test:integration": "node --test packages/db/test/integration*.pg.test.mjs",
+    "preview": "node preview/server.mjs",
+    "worker:production": "node apps/worker/production.mjs",
+    "demo:video": "node apps/worker/demo.mjs",
+    "console:local": "node apps/control-server/server.mjs",
+    "console:start": "node scripts/start-local-console.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

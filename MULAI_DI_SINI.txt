@@ -1,0 +1,73 @@
+Dramasaku Studio — CP020 Lokal Internal, versi 0.6.0
+8 November 2026
+
+MULAI
+1. Ekstrak ZIP ke folder milik operator. Jangan jalankan dari dalam ZIP.
+2. Siapkan Node.js 22 atau 24, serta FFmpeg dan FFprobe di PATH.
+   Periksa di terminal: node --version, ffmpeg -version, ffprobe -version.
+3. Buka terminal di folder yang memuat package.json, jalankan: npm run dev
+   Tidak perlu npm install untuk aplikasi lokal ini.
+4. Buka http://127.0.0.1:4184 dan masuk memakai kode akses yang tampil di terminal.
+5. Hentikan dengan Ctrl+C. Backend hanya menerima koneksi loopback komputer sendiri.
+
+ALUR TIM INTERNAL
+1. Proyek & Cerita: isi nama, naskah, karakter, gaya visual; simpan.
+2. Storyboard: tinjau shot dan edit prompt, kirim ke Buat Video lalu Simpan Draf.
+3. Studio Gambar/Gerak: simpan arahan; impor JPG/PNG/WebP dan media referensi.
+4. Buat Video: pilih model, mode, pengaturan dan peran referensi; Uji Mode Lokal.
+   Tes memeriksa payload dan adapter dengan respons fixture di memori. Tidak membuat video AI.
+   Draf menyimpan prompt, model, mode, rasio, durasi, pengaturan, serta urutan referensi.
+5. Studio Suara: simpan narasi atau impor MP3/WAV. Generate suara tetap OFF.
+6. Persetujuan: putar/tinjau media; tulis nama dan catatan; setujui atau minta revisi.
+7. Studio Film: pilih media, rentang klip, urutan, dan audio; simpan susunan; Render Film Lokal.
+   Semua aset yang dipakai perlu review untuk versi cerita saat ini. Unduh MP4 yang selesai.
+8. Proyek & Cerita > Ekspor Paket Tim. Kirim berkas .studio.json secara manual.
+   Penerima memakai Impor Paket Tim di salah satu merek; tinjau preview dan konfirmasi.
+   Review harus dikonfirmasi ulang oleh penerima sebelum render. Unduh MP4 terpisah bila diperlukan.
+
+MODE AIIDE
+- Seedance 2.0 dan Fast: Text, Image/First frame, First & Last, Reference gambar/video/audio.
+- Happyhorse: profil terpisah untuk Text, Image, Reference gambar, dan Video Edit.
+- Seed-2.0 Sora-format fast/pro: Text dan Reference gambar/video.
+- Veo 3.1 4/6/8 detik: Text/Reference dengan batas gambar mengikuti profil.
+- Extend belum tersedia. Model mini/2.5 belum dimasukkan karena kontrak generate AIIDE belum diverifikasi.
+- Resolusi, rasio, durasi, jumlah/jenis referensi, audio dan watermark mengikuti profil model.
+- File komputer tidak bisa dibaca provider. URL HTTPS publik/aset AIIDE dapat dicatat lokal untuk persiapan; aplikasi tidak mengunggah file ke provider.
+- Referensi berwajah dapat membutuhkan moderasi aset pada provider. Penyimpanan alamat bukan bukti moderasi atau akses provider.
+
+API KEY DAN BIAYA
+Bootstrap CP020 selalu mengunci generate berbayar OFF. Flag live lama tidak mengaktifkannya.
+Key tidak membuka generate secara otomatis. Uji Mode Lokal bisa digunakan tanpa key.
+Kunci API > Video > AIIDE menyimpan key terenkripsi di perangkat sendiri.
+Periksa Koneksi mengirim GET /v1/models melalui backend; tidak mengirim POST generate.
+Task ID yang sudah ada bisa diperiksa lewat Ambil hasilnya. Gunakan akun pemilik task.
+Hanya status GET dan unduhan hasil yang dipakai. Domain CDN perlu diverifikasi sebelum download otomatis diizinkan melalui DRAMASAKU_AIIDE_MEDIA_HOSTS.
+Tambahkan ke Proyek memasukkan video yang sudah diunduh ke perpustakaan lokal untuk review/render.
+Tidak ada key asli, token operator, task provider, atau data QA pengguna dalam ZIP distribusi.
+API key, token, dan folder .local-private tidak boleh dibagikan kepada tim.
+
+BATAS LOKAL
+- Satu operator per komputer; satu proyek aktif. Tidak ada sinkronisasi otomatis, merge proyek, atau akun tim/RBAC.
+- Ekspor Cerita hanya memindahkan input kreatif. Ekspor Paket Tim juga memindahkan media dan draf.
+- Paket: media total 64 MB, maksimal 100 aset, 100 draf video, 200 draf suara.
+- Per file: gambar/audio 10 MB; video 20 MB. Pustaka perangkat: 250 aset / 500 MB.
+- Film: 24 klip, total 300 detik, 1–60 detik per klip. Keluaran 1280x720 24 fps.
+- Rasio media dipertahankan dengan bingkai. Audio pengganti menimpa audio klip; bagian kurang panjang menjadi hening. Tidak ada mixing multitrack/transisi otomatis.
+- Paket tidak menyertakan hasil render, API key, URL provider, task provider atau kredensial. Draf versi CP019 dapat diunduh untuk referensi manual; parameter yang dahulu tidak disimpan tidak bisa dipulihkan.
+- Nama peninjau adalah catatan operator; bukan autentikasi identitas atau persetujuan server tim.
+
+UPGRADE DAN PEMULIHAN
+Hentikan versi lama, lalu cadangkan seluruh folder .local-private sebelum mengganti source.
+Untuk instalasi merek yang sama, pertahankan .local-private lengkap termasuk file operator dan pasangan kunci enkripsi. Jangan gabungkan dua folder privat.
+Untuk komputer lain/merek lain, gunakan Paket Tim; masing-masing komputer membuat kredensial sendiri.
+Impor paket menyimpan cadangan proyek aktif di .local-private/project-backups/*.studio.json.
+Untuk kembali ke versi proyek lama, pilih berkas cadangan tersebut melalui Impor Paket Tim, lalu konfirmasi review ulang.
+File sumber asli tetap tersimpan; impor tidak menghapus media. Penggantian proyek bukan penggabungan perubahan.
+Jika sesi berakhir, salin isian yang belum tersimpan lalu masuk ulang. Simpan draf dan susunan sebelum menutup tab.
+
+STATUS PENGUJIAN
+Lihat checkpoints/CP020_VERIFICATION.json untuk hasil pengujian paket ini.
+Tes lokal: kontrak/payload, adapter dengan mock, HTTP/auth/CSRF, persistensi, portable package, review dan FFmpeg nyata.
+Dua tes PostgreSQL tidak dijalankan karena database tidak disiapkan; jalur lokal tidak memakai database tersebut.
+Windows dan akun AIIDE nyata belum diuji pada rilis ini. Tidak ada klaim video AI atau biaya provider sudah terverifikasi.
+Menu Status Sistem menampilkan kesiapan FFmpeg/FFprobe. Panduan checkpoint lama bersifat historis.
