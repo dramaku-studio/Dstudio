@@ -259,7 +259,16 @@ async function sdOpenDraft(id){try{
  const {job}=await api('/api/aiide-video/drafts/'+id),input=job.request;
  $('sd-model').value=input.model;sdChosen=[];sdRevise();$('sd-mode').value=input.mode;sdChosen=input.assets.map(x=>({...x}));sdRevise();
  for(const [field,value] of Object.entries({'sd-prompt':input.prompt,'sd-prompt-language':input.promptLanguage,'sd-ratio':input.ratio,'sd-resolution':input.resolution,'sd-duration':input.duration}))$(field).value=String(value);
- $('sd-audio').checked=input.generateAudio;$('sd-watermark').checked=input.watermark;sdRevise();openView('video-studio');sdText('sd-plan-status','Draf dipulihkan lengkap. Periksa referensi sebelum melanjutkan.');
+ $('sd-audio').checked=input.generateAudio;$('sd-watermark').checked=input.watermark;sdRevise();openView('video-studio');const missing=input.assets.length-sdChosen.length;
+ if(missing){
+  const counts={image:0,audio:0,video:0},original=new Map();
+  for(const ref of input.assets){
+   const kind=ref.role==='reference_audio'?'audio':ref.role==='reference_video'?'video':'image';
+   original.set(ref.assetId,'@'+kind+(++counts[kind]));
+  }
+  sdRemapPromptTags(original);updatePromptCount('sd-prompt');
+ }
+ sdText('sd-plan-status',missing?missing+' lampiran telah dihapus. Pilih pengganti dan simpan draf baru.':'Draf dipulihkan lengkap. Periksa referensi sebelum melanjutkan.');
  }catch(e){sdText('sd-plan-status',studioError(e));}}
 function sdInput(){const seed=$('sd-seed').value.trim();return {model:$('sd-model').value,mode:sdMode(),prompt:$('sd-prompt').value,promptLanguage:$('sd-prompt-language').value,ratio:$('sd-ratio').value,resolution:$('sd-resolution').value,duration:Number($('sd-duration').value),generateAudio:$('sd-audio').checked,watermark:$('sd-watermark').checked,draft:$('sd-draft').checked,...(seed===''?{}:{seed:Number(seed)}),assets:sdChosen.map(x=>({...x}))};}
 $('sd-provider').addEventListener('change',async()=>{sdStopPolling();sdPollCount=0;await sdRenderLiveJobs().catch(e=>sdText('sd-live-status',e.message));});
@@ -398,6 +407,7 @@ const pageMeta={
  'history':['Riwayat Karya','Lihat aktivitas dan draf terbaru.'],
  'credentials':['Pengaturan Kunci API','Kelola layanan AI untuk tim.'],
  'audit':['Status Studio','Lihat fitur yang siap digunakan.'],
+ 'assets':['Aset','Kelola media lokal untuk produksi.'],
  'team-password':['Ganti Password','Kelola password tim pada perangkat ini.'],
  'help':['Panduan & Ketentuan','Pelajari cara menggunakan Dramasaku.']
 };

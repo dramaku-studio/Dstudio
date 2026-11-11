@@ -1,5 +1,5 @@
 /** Private, loopback-only Seedance draft/asset storage. NOT production object storage. */
-import {mkdir,readFile,writeFile,rename,open,lstat} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,rename,open,lstat,rm} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {randomBytes,createHash} from 'node:crypto';
 import {compileSeedanceRequest} from '../../providers/src/seedance.mjs';
@@ -19,14 +19,35 @@ function sniff(bytes){
  if(bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WAVE')return {kind:'audio',mime:'audio/wav',ext:'wav',max:10*1024*1024};
  throw new AssetValidationError('UNSUPPORTED_MEDIA_SIGNATURE');
 }
-export function createSeedanceLocalStore({root}={}){
+export function createSeedanceLocalStore({root,clock=Date.now}={}){
  if(typeof root!=='string'||!root.trim())throw Error('PRIVATE_ASSET_ROOT_REQUIRED');
- const folder=resolve(root),idx=join(folder,'index.json');let assets=[],jobs=[],chain=Promise.resolve();
- async function persist(){const tmp=join(folder,`index-${randomBytes(8).toString('hex')}.tmp`);await writeFile(tmp,JSON.stringify({schema:1,assets,jobs}),{mode:0o600,flag:'wx'});await rename(tmp,idx);}
+ const folder=resolve(root),idx=join(folder,'index.json');let assets=[],jobs=[],pending=[],chain=Promise.resolve();
+ async function persist(nextAssets=assets,nextPending=pending){const tmp=join(folder,`index-${randomBytes(8).toString('hex')}.tmp`);await writeFile(tmp,JSON.stringify({schema:1,assets:nextAssets,jobs,pending:nextPending}),{mode:0o600,flag:'wx'});await rename(tmp,idx);}
  const serialize=fn=>{const task=chain.then(fn);chain=task.catch(()=>{});return task;};
+ const expiresAt=asset=>Date.parse(asset.createdAt)+72*60*60*1000;
+ async function removeFiles(ids){
+  if(ids.length){
+   const removed=new Set(ids),next=assets.filter(asset=>!removed.has(asset.id)),todo=[...new Set([...pending,...ids])];
+   await persist(next,todo);
+   assets=next;pending=todo;
+  }
+  if(!pending.length)return;
+  for(const id of pending){
+   if(!validId.test(id))throw Error('INVALID_LOCAL_INDEX');
+   await rm(join(folder,id+'.bin'),{force:true});
+  }
+  await persist(assets,[]);
+  pending=[];
+ }
  return Object.freeze({
- async init(){await mkdir(folder,{recursive:true,mode:0o700});try{const state=JSON.parse(await readFile(idx,'utf8'));if(state.schema!==1||!Array.isArray(state.assets)||!Array.isArray(state.jobs))throw Error('INVALID_LOCAL_INDEX');assets=state.assets;jobs=state.jobs;}catch(e){if(e.code!=='ENOENT')throw e;await persist();}},
- listAssets(){return structuredClone(assets).slice().reverse();},
+ async init(){await mkdir(folder,{recursive:true,mode:0o700});try{const state=JSON.parse(await readFile(idx,'utf8'));if(state.schema!==1||!Array.isArray(state.assets)||!Array.isArray(state.jobs))throw Error('INVALID_LOCAL_INDEX');assets=state.assets;jobs=state.jobs;pending=state.pending??[];if(!Array.isArray(pending)||pending.some(id=>typeof id!=='string'||!validId.test(id)))throw Error('INVALID_LOCAL_INDEX');}catch(e){if(e.code!=='ENOENT')throw e;await persist();}},
+ listAssets(){return structuredClone(assets).reverse().map(asset=>({...asset,expiresAt:new Date(expiresAt(asset)).toISOString()}));},
+ async expireAssets(inUse=()=>false){return serialize(()=>removeFiles(assets.filter(a=>expiresAt(a)<=clock()&&!inUse(a.id)).map(a=>a.id)));},
+ async removeAsset(id,projectId){return serialize(async()=>{
+  const found=this.resolveAsset(id);
+  if(!found||(found.projectId&&found.projectId!==projectId))throw new AssetValidationError('ASSET_NOT_FOUND');
+  await removeFiles([id]);
+ });},
  resolveAsset(id){return validId.test(String(id))?assets.find(x=>x.id===id):null;},
  async addAsset(bytes,name,{projectId=null}={}){return serialize(async()=>{
   if(!Buffer.isBuffer(bytes)||bytes.length>20*1024*1024||bytes.length<12)throw new AssetValidationError('ASSET_SIZE_INVALID');
@@ -36,7 +57,7 @@ export function createSeedanceLocalStore({root}={}){
   const clean=name.replace(/[\x00-\x1f\x7f]/g,'').split(/[\\/]/).pop().slice(0,120)||'attachment';
   const id=randomBytes(12).toString('hex'),path=join(folder,id+'.bin');
   const f=await open(path,'wx',0o600);try{await f.writeFile(bytes);}finally{await f.close();}
-  const asset={id,name:clean,kind:type.kind,mime:type.mime,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),createdAt:new Date().toISOString(),projectId};assets.push(asset);await persist();return asset;
+  const asset={id,name:clean,kind:type.kind,mime:type.mime,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),createdAt:new Date(clock()).toISOString(),projectId};assets.push(asset);await persist();return asset;
  });},
  async inspectAsset(id){
   const asset=this.resolveAsset(id);if(!asset)throw new AssetValidationError('ASSET_NOT_FOUND');

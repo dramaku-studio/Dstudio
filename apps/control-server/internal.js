@@ -20,9 +20,67 @@ async function internalUpload(inputId,statusId){
  try{for(const file of files){
   const response=await fetch('/api/seedance/assets',{method:'POST',headers:{'content-type':'application/octet-stream','x-dramasaku-csrf':csrf,'x-asset-name':encodeURIComponent(file.name)},credentials:'same-origin',body:file});
   const result=await response.json();if(!response.ok)throw Error(result.error);await api(`/api/seedance/assets/${result.asset.id}/inspect`,{method:'POST',body:{}});
- }$(inputId).value='';await sdRefresh();await internalReload();$(statusId).textContent='Media lokal tersimpan dan terbaca. Tidak diunggah ke provider.';}catch(e){$(statusId).textContent=studioError(e);}
+ }$(inputId).value='';await sdRefresh();await internalReload();$(statusId).textContent='Media lokal tersimpan dan terbaca. Tidak diunggah ke provider.';}catch(e){$(statusId).textContent=studioError(e);await sdRefresh();await internalReload();}
 }
+function paintAssetLibrary(){
+ const grid=$('library-items');grid.replaceChildren();
+ $('asset-count').textContent=sdAssets.length+' aset';
+ for(const asset of sdAssets){
+  const card=internalNode('article',undefined,'internal-media-card library-card');
+  const preview=internalNode('div',undefined,'library-preview');
+  const remove=internalButton('🗑',async()=>{
+   if(!confirm('Hapus '+asset.name+' dari pustaka lokal? Klip dan review yang memakainya akan dilepas.'))return;
+   try{
+    await api('/api/seedance/assets/'+asset.id,{method:'DELETE'});
+    await sdRefresh();await internalReload();
+    $('library-status').textContent=asset.name+' dihapus.';
+   }catch(e){$('library-status').textContent=studioError(e);}
+  });
+  remove.classList.add('library-delete');remove.setAttribute('aria-label','Hapus '+asset.name);remove.title='Hapus aset';
+  preview.append(internalMedia(asset),remove);
+  const limit=new Date(asset.expiresAt||Date.parse(asset.createdAt)+72*3600000);
+  card.append(preview,internalNode('strong',asset.name),internalNode('small','Hapus otomatis '+limit.toLocaleString()));
+  if(asset.kind!=='audio'||asset.mime==='audio/mpeg'){
+   card.append(internalButton('Lampirkan ke video',async()=>{
+    try{
+     if(!asset.inspected)Object.assign(asset,(await api('/api/seedance/assets/'+asset.id+'/inspect',{method:'POST',body:{}})).asset);
+     if(!sdAcceptsAsset(asset)&&!internalSelectMode('reference',asset.kind)){
+      $('library-status').textContent='Pilih model yang mendukung jenis media ini.';return;
+     }
+     if(!sdChosen.some(ref=>ref.assetId===asset.id))sdAttachAsset(asset);
+     openView('video-studio');
+     sdText('sd-upload-status',asset.name+' terlampir.');
+    }catch(e){openView('assets');$('library-status').textContent=studioError(e);}
+   }));
+  }
+  grid.append(card);
+ }
+ if(!sdAssets.length)grid.textContent='Belum ada aset tersimpan.';
+}
+$('library-upload').addEventListener('change',async()=>{
+ const input=$('library-upload');if(!input.files.length)return;
+ input.disabled=true;
+ try{await internalUpload('library-upload','library-status');}
+ finally{input.value='';input.disabled=false;}
+});
+// Update open galleries after background expiry or edits from a second tab.
+let libraryUpdating=false;
+async function refreshAssetGallery(){
+ if(!csrf||location.hash!=='#assets'||document.hidden||libraryUpdating)return;
+ libraryUpdating=true;
+ try{
+  const latest=await api('/api/seedance/assets');
+  if(latest.assets.length!==sdAssets.length||latest.assets.some((asset,i)=>asset.id!==sdAssets[i].id)){
+   await sdRefresh();await internalReload();
+  }
+ }catch(e){$('library-status').textContent=studioError(e);}
+ finally{libraryUpdating=false;}
+}
+window.addEventListener('hashchange',refreshAssetGallery);
+document.addEventListener('visibilitychange',refreshAssetGallery);
+setInterval(refreshAssetGallery,60_000);
 function internalPaintMedia(){
+ paintAssetLibrary();
  const images=$('image-library'),voices=$('voice-library');images.replaceChildren();voices.replaceChildren();
  for(const a of sdAssets){
   if(a.kind==='image'){const card=internalNode('article',undefined,'internal-media-card');card.append(internalMedia(a),internalNode('strong',a.name),internalButton('Gunakan sebagai Frame Awal',()=>{if(!internalSelectMode('image_to_video'))return;sdChosen=[{assetId:a.id,role:'first_frame'}];sdRevise();}));images.append(card);}
@@ -33,8 +91,8 @@ function internalPaintMedia(){
  sdOptions('film-audio',[{id:'',label:'Pertahankan audio klip'},...sdAssets.filter(a=>a.kind==='audio').map(a=>({id:a.id,label:a.name}))],internalDirty?$('film-audio').value:internalAudio||'');
  if(internalState)internalPaintReviews();
 }
-function internalSelectMode(mode){
- const choices=(sdCatalog?.models||[]).filter(model=>model.modes.includes(mode));
+function internalSelectMode(mode,kind){
+ const choices=(sdCatalog?.models||[]).filter(model=>model.modes.includes(mode)&&(!kind||model[{image:'maxImages',audio:'maxAudios',video:'maxVideos'}[kind]]));
  const entitled=choices.filter(model=>sdLiveConfiguration?.availableModels?.includes(model.id));
  const candidates=entitled.length?entitled:choices;
  const model=candidates.find(model=>model.id===$('sd-model').value)||candidates[0];
@@ -108,7 +166,7 @@ function internalPaintTimeline(){
 }
 function internalShowRender(r){const url=`/api/production/renders/${r.id}/media`;$('film-player').src=url;$('film-player').load();$('film-download').href=url;$('film-download').hidden=false;$('film-status').textContent=`Film lokal siap · ${r.duration} detik${r.current?'':' · versi sebelumnya'}.`;}
 function internalPaintWorkflow(){
- const p=internalState,rows=[['Cerita & storyboard',p.projectHash?`${p.shotCount} shot tersimpan`:'Belum disimpan','projects'],['Referensi & draf',`${sdAssets.length} media lokal`,'image-studio'],['Review aset',`${p.approvedAssets} aset disetujui untuk versi ini`,'approvals'],['Susunan & render',`${p.timeline.clips.length} klip tersimpan; ${p.renders.filter(r=>r.status==='ready'&&r.current).length} render terkini`,'film-studio'],['Handoff tim','Ekspor paket proyek dan unduh MP4','projects']];
+ const p=internalState,rows=[['Cerita & storyboard',p.projectHash?`${p.shotCount} shot tersimpan`:'Belum disimpan','projects'],['Referensi & draf',`${sdAssets.length} media lokal`,'assets'],['Review aset',`${p.approvedAssets} aset disetujui untuk versi ini`,'approvals'],['Susunan & render',`${p.timeline.clips.length} klip tersimpan; ${p.renders.filter(r=>r.status==='ready'&&r.current).length} render terkini`,'film-studio'],['Handoff tim','Ekspor paket proyek dan unduh MP4','projects']];
  const grid=$('production-workflow');grid.replaceChildren();for(const [title,status,view] of rows){const c=internalNode('article',undefined,'internal-step');c.append(internalNode('h3',title),internalNode('p',status),internalButton('Buka',()=>openView(view)));grid.append(c);}
  $('stage').textContent=p.projectHash?'Proyek lokal aktif':'Belum ada proyek';$('stagedetail').textContent=p.projectName||'Simpan cerita untuk memulai.';$('shots').textContent=String(p.shotCount);
 }
@@ -150,6 +208,10 @@ $('history-job-filter').addEventListener('change',internalPaintHistory);
 async function internalReload(){
  const state=await api('/api/production'),previous=internalState;internalState=state;
  if(previous?.projectId!==state.projectId){$('film-player').pause();$('film-player').removeAttribute('src');$('film-player').load();$('film-download').hidden=true;}
+ if(internalDirty){
+  internalTimeline=internalTimeline.filter(clip=>sdAssets.some(a=>a.id===clip.assetId));
+  if(internalAudio&&!sdAssets.some(a=>a.id===internalAudio)){internalAudio=null;$('film-audio').value='';}
+ }
  if(!internalDirty||previous?.projectId!==state.projectId){internalTimeline=structuredClone(state.timeline.clips);internalAudio=state.timeline.audioAssetId;internalDirty=false;}
  sdOptions('image-shot',[{id:'',label:'Tanpa shot'},...(activeWorkspace?.plan.shots||[]).map(s=>({id:s.id,label:`${s.id} · ${s.description.slice(0,70)}`}))],$('image-shot').value);
  internalPaintBriefs();internalPaintMedia();internalPaintTimeline();internalPaintWorkflow();
@@ -186,7 +248,7 @@ $('film-save').onclick=async()=>{const saved=await internalChange('timeline',{cl
 $('film-generate').onclick=async()=>{if(internalDirty){$('film-status').textContent='Simpan susunan terbaru sebelum render.';return;}if(!internalSystem?.tools.every(t=>t.available)){openView('audit');await internalReadiness();return;}await internalChange('render',{},'film-status');};
 $('studio-status-refresh').onclick=async()=>{try{await internalReadiness();await internalReload();}catch(e){$('studio-status-message').textContent=studioError(e);}};
 $('studio-logout').onclick=async()=>{if(!confirm('Keluar dari sesi lokal? Simpan isian terlebih dahulu.'))return;await api('/api/logout',{method:'POST',body:{}});location.reload();};
-$('team-export').onclick=async()=>{try{const r=await fetch('/api/project-package/export',{credentials:'same-origin',cache:'no-store'});if(!r.ok)throw Error((await r.json()).error);const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download='dramasaku-project.studio.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);$('team-status').textContent='Paket tim diunduh. API key, task provider, dan alamat referensi provider tidak disertakan.';}catch(e){$('team-status').textContent=studioError(e);}};
+$('team-export').onclick=async()=>{try{const r=await fetch('/api/project-package/export',{credentials:'same-origin',cache:'no-store'});if(!r.ok)throw Error((await r.json()).error);const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download='dramasaku-project.studio.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);$('team-status').textContent='Paket tim diunduh. API key, task provider, dan alamat referensi provider tidak disertakan.';const skipped=Number(r.headers.get('x-skipped-video-drafts'));if(skipped)$('team-status').textContent+=' '+skipped+' draf video dengan lampiran hilang hanya tersedia di riwayat lokal.';}catch(e){$('team-status').textContent=studioError(e);}};
 $('team-import').onclick=()=>$('team-file').click();
 $('team-file').onchange=async()=>{const f=$('team-file').files?.[0];if(!f)return;try{if(f.size>94_000_000)throw Error('PACKAGE_LIMIT');const bundle=JSON.parse(await f.text()),preview=await api('/api/project-package/preview',{method:'POST',body:bundle}),current=await api('/api/workspace'),state=await api('/api/production');
  if(!confirm(`Impor proyek “${preview.projectName}” dengan ${preview.assets} media, ${preview.videoDrafts} draf video, dan ${preview.voiceDrafts} draf suara? Proyek aktif diganti; paket cadangan dibuat. Isian yang belum disimpan akan hilang. Review perlu dikonfirmasi ulang.`))return;

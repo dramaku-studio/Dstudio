@@ -105,3 +105,19 @@ test('new HTTP routes require session/CSRF; configured API key and successful lo
 });
 
 test('identical frame bytes retain separate reference IDs during project import',async()=>{const a=await harness(),b=await harness();try{const first=await a.assets.addAsset(png,'first.png',{projectId:a.projectId}),last=await a.assets.addAsset(png,'last.png',{projectId:a.projectId});await a.assets.createJob({model:'doubao-seedance-2-0-260128',mode:'first_last',prompt:'Loop back to the first frame.',duration:5,resolution:'provider_default',ratio:'16:9',assets:[{assetId:first.id,role:'first_frame'},{assetId:last.id,role:'last_frame'}]},{provider:'aiide',projectId:a.projectId});const state=await b.production.state();await b.packages.import({bundle:await a.packages.export(),replace:true,expectedCurrentInputHash:state.projectHash,expectedProductionRevision:state.revision});const request=(await b.assets.getJob(b.assets.listJobs()[0].id)).request;assert.notEqual(request.assets[0].assetId,request.assets[1].assetId);assert.deepEqual(request.assets.map(x=>x.role),['first_frame','last_frame']);}finally{await a.close();await b.close();}});
+
+test('deleted library media detaches from reviews and timeline, drafts stay editable and export remains portable',async()=>{
+ const h=await harness();
+ try{
+  const a=await h.assets.addAsset(png,'source.png',{projectId:h.projectId});
+  await h.production.review({...await h.expected(),assetId:a.id,reviewer:'QA',decision:'approved',note:''});
+  await h.production.timeline({...await h.expected(),clips:[{assetId:a.id,start:0,duration:1}]});
+  const plan={model:'doubao-seedance-2-0-fast-260128',mode:'image_to_video',prompt:'A frame',duration:5,resolution:'provider_default',ratio:'16:9',assets:[{assetId:a.id,role:'first_frame'}]};
+  const {job}=await h.assets.createJob(plan,{provider:'aiide',projectId:h.projectId});
+  await h.assets.removeAsset(a.id,h.projectId);await h.production.pruneMissingAssets();
+  const state=await h.production.state();assert.equal(state.timeline.clips.length,0);assert.equal(state.reviews.length,0);
+  assert.equal((await h.assets.getJob(job.id)).request.prompt,plan.prompt);
+  let missing;const bundle=await h.packages.export({onMissingDrafts:n=>{missing=n;}});
+  assert.equal(missing,1);assert.equal(h.packages.preview(bundle).assets,0);
+ }finally{await h.close();}
+});

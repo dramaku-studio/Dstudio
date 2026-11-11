@@ -1,6 +1,7 @@
 /** Creative-facing translations; no credentials or production data stored in browser. */
 (()=>{
  const pairs=[
+ ['▧  Aset','▧  Assets'],['Aset','Assets'],['Aset tersimpan','Saved assets'],['Kelola media lokal untuk produksi.','Manage local production media.'],['Tambah gambar, video, atau audio','Add images, video, or audio'],['Lampirkan ke video','Attach to video'],['Belum ada aset tersimpan.','No saved assets.'],['Setiap file disimpan 72 jam sejak diunggah. Waktu hapus tertera pada setiap aset.','Each file is kept for 72 hours after upload. Its deletion time is shown on the card.'],
  ['Ganti Password','Change Password'],['Password tim','Team password'],['Password saat ini','Current password'],['Password baru','New password'],['Ulangi password baru','Confirm new password'],['Simpan password','Save password'],['Penerbit API key','API key issuer'],['Pilih penyedia','Select provider'],['Masukkan password tim untuk membuka studio.','Enter the team password to open the studio.'],
  ['Perluas prompt','Expand prompt'],['Ringkas tampilan','Collapse prompt'],['Gunakan untuk Gambar','Use in Image Studio'],['Karakter dan gaya visual','Characters and visual style'],
  ['Pilih dari pustaka lokal','Choose from local library'],['Cari nama media','Search media by name'],['Media yang dapat dilampirkan','Available media'],['Lampirkan media','Attach media'],['Belum ada media yang dapat dipilih','No available media'],['Tidak ada media yang cocok','No matching media'],['Gambar referensi','Reference images'],

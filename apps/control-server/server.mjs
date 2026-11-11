@@ -154,7 +154,7 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
    if(req.method==='GET'&&p==='/api/production')return send(200,await production.state());
    if(req.method==='POST'&&/^\/api\/production\/(brief|review|timeline|render)$/.test(p)){const input=await readJson(30000);return send(p.endsWith('/render')?202:200,await edit(()=>production[p.split('/')[3]](input)));}
    if(req.method==='GET'&&/^\/api\/production\/renders\/[a-f0-9]{24}\/media$/.test(p)){const media=await production.media(p.split('/')[4]);res.writeHead(200,{'content-type':'video/mp4','content-length':media.size,'content-disposition':'inline; filename=dramasaku-film-lokal.mp4',...security});media.stream.pipe(res);return;}
-   if(req.method==='GET'&&p==='/api/project-package/export'){const data=await edit(()=>packages.export());const body=JSON.stringify(data);res.writeHead(200,{'content-type':'application/json; charset=utf-8','content-disposition':'attachment; filename=dramasaku-project.studio.json','content-length':Buffer.byteLength(body),...security});res.end(body);return;}
+   if(req.method==='GET'&&p==='/api/project-package/export'){let skipped=0;const data=await edit(()=>packages.export({onMissingDrafts:n=>{skipped=n;}}));const body=JSON.stringify(data);res.writeHead(200,{'content-type':'application/json; charset=utf-8','content-disposition':'attachment; filename=dramasaku-project.studio.json','x-skipped-video-drafts':String(skipped),'content-length':Buffer.byteLength(body),...security});res.end(body);return;}
    if(req.method==='POST'&&p==='/api/project-package/preview')return send(200,packages.preview(await readJson(95_000_000)));
    if(req.method==='POST'&&p==='/api/project-package/import'){const input=await readJson(95_000_000);return send(200,await edit(()=>packages.import(input)));}
    if(req.method==='GET'&&p==='/api/studio/status')return send(200,{version:'0.8.0',mode:'local_internal',tools:await localTools(),paidVideoEnabled:activation?(await activation.status()).ready:aiideVideoEnabled&&aiideVideoCapabilityVerified,paidTtsEnabled:ttsEnabled&&(ttsCapabilityVerified||aiideTtsCapabilityVerified),paidImageEnabled:false,readOnlyAiide:aiideReadOnlyEnabled,modelCount:aiideVideoCatalog().models.length,sharing:'portable_package',maxPackageMediaBytes:64*1024*1024,multiUser:false});
@@ -178,6 +178,14 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
    if(req.method==='POST'&&p==='/api/live/submit')return send(201,{job:await live.submit(await readJson(16000))});
    if(req.method==='POST'&&/^\/api\/live\/jobs\/[a-f0-9]{24}\/check$/.test(p))return send(200,{job:await live.check(p.split('/')[4])});
    if(req.method==='GET'&&/^\/api\/live\/jobs\/[a-f0-9]{24}\/media$/.test(p)){const info=await live.mediaPath(p.split('/')[4]);res.writeHead(200,{'content-type':'video/mp4','content-length':info.size,'content-disposition':'inline; filename=dramasaku-live.mp4',...security});info.stream.pipe(res);return;}
+   if(req.method==='DELETE'&&/^\/api\/seedance\/assets\/[a-f0-9]{24}$/.test(p)){
+    return await edit(async()=>{
+     if(production.isRenderSource(p.split('/')[4]))return fail(409,'RENDER_BUSY');
+     await seedance.removeAsset(p.split('/')[4],await currentProject());
+     await production.pruneMissingAssets();
+     return send(200,{deleted:true});
+    });
+   }
    if(req.method==='GET'&&p==='/api/seedance/assets'){const projectId=await currentProject();return send(200,{assets:seedance.listAssets().filter(a=>!a.projectId||a.projectId===projectId)});}
    if(req.method==='POST'&&/^\/api\/seedance\/assets\/[a-f0-9]{24}\/reference$/.test(p)){const {reference}=await readJson(3000);return send(200,{asset:await seedance.bindReference(p.split('/')[4],reference)});}
    if(req.method==='POST'&&/^\/api\/seedance\/assets\/[a-f0-9]{24}\/inspect$/.test(p))return send(200,{asset:await seedance.inspectAsset(p.split('/')[4])});
@@ -245,7 +253,27 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
    return fail(404,'NOT_FOUND');
   }catch(e){const expected=['SECRET_INVALID','INVALID_PROVIDER_SLOT','INVALID_STATE','INVALID_ACTION','VAULT_FORMAT_INVALID'];return fail(e.status||(e.name==='DomainError'||expected.includes(e.code||e.message)?422:500),e.code||'SERVER_ERROR');}
  });
- return {server,vault,keyPools,demo,seedance,workspace,live,aiideVideo,tts,production,packages,listen:async()=>{await seedance.init();await live.init();await aiideVideo.init();await tts.init();await production.init();return new Promise(resolve=>server.listen(port,host,resolve));}};
+ async function cleanAssets(){
+  await seedance.expireAssets(production.isRenderSource);
+  await production.pruneMissingAssets();
+ }
+ return {server,vault,keyPools,demo,seedance,workspace,live,aiideVideo,tts,production,packages,listen:async()=>{await seedance.init();await live.init();await aiideVideo.init();await tts.init();await production.init();
+  await cleanAssets();
+  await new Promise(resolve=>server.listen(port,host,resolve));
+  let timer;
+  function schedule(){
+   if(!server.listening)return;
+   const deadlines=seedance.listAssets().filter(a=>!production.isRenderSource(a.id)).map(a=>Date.parse(a.expiresAt)-Date.now());
+   const delay=Math.max(1000,Math.min(60_000,...deadlines));
+   timer=setTimeout(async()=>{
+    try{await edit(cleanAssets);}catch{console.error('Pembersihan aset gagal. Akan dicoba kembali.');}
+    schedule();
+   },delay);
+   timer.unref();
+  }
+  schedule();
+  server.once('close',()=>clearTimeout(timer));
+ }};
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{const port=Number(process.env.PORT||4184);const app=createLocalConsole({port});await app.listen();console.log(`Dramasaku offline operator console: http://127.0.0.1:${port} (local only; paid APIs disabled)`);}catch(e){console.error(`Cannot start local console: ${e.message}`);process.exitCode=1;}

@@ -33,10 +33,15 @@ function validate(bundle){
 }
 export function createProjectPackages({root,workspace,assets,production,tts}){
  return {
-  async export(){
+  async export({onMissingDrafts}={}){
    const current=await workspace.read();if(!current)throw bad('PROJECT_NOT_SAVED',409);
    const creative=await workspace.exportPortable(),p=await production.exportState();
-   const drafts=[];for(const d of assets.listJobs().filter(x=>x.provider==='aiide'&&x.projectId===current.projectId))drafts.push((await assets.getJob(d.id)).request);
+   let skipped=0;
+   const drafts=[];for(const d of assets.listJobs().filter(x=>x.provider==='aiide'&&x.projectId===current.projectId)){
+    const request=(await assets.getJob(d.id)).request;
+    if(request.assets.every(ref=>assets.resolveAsset(ref.assetId)))drafts.push(request);else skipped++;
+   }
+   onMissingDrafts?.(skipped);
    const selected=new Set([...p.reviews.map(x=>x.assetId),...p.timeline.clips.map(x=>x.assetId),...(p.timeline.audioAssetId?[p.timeline.audioAssetId]:[]),...drafts.flatMap(d=>d.assets.map(x=>x.assetId)),...assets.listAssets().filter(a=>a.projectId===current.projectId).map(a=>a.id)]);
    const files=[];let size=0;for(const id of selected){const {asset,bytes}=await assets.readAsset(id);size+=bytes.length;if(size>64*1024*1024)throw bad('PACKAGE_MAX_64_MB');files.push({id:asset.id,name:asset.name,kind:asset.kind,sha256:asset.sha256,data:bytes.toString('base64')});}
    const payload={projectId:current.projectId,creative,production:p,assets:files,videoDrafts:drafts,voiceDrafts:await tts.exportDrafts(current.projectId)};

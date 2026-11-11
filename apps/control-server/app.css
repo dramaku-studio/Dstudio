@@ -135,3 +135,9 @@ textarea.prompt-expanded { height: min(55vh, 32rem); }
 body.signed-out :is(.sidebar,.view-section,#studio-logout,.internal-banner){display:none!important}
 body.signed-out .layout{display:block}
 body.signed-out main{max-width:680px;margin:auto}
+
+.library-preview{position:relative;padding-top:8px}
+.library-preview .internal-media{display:block;width:100%;max-height:180px;object-fit:contain}
+.library-card .library-delete{position:absolute;top:0;right:0;min-width:42px;min-height:42px;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px}
+.library-card:has(audio) .library-preview{padding-top:48px}
+.library-card strong{overflow-wrap:anywhere}

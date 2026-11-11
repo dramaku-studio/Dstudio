@@ -13,6 +13,7 @@ const text=(s,n,optional=false)=>{if(typeof s!=='string'||s.length>n||(!optional
 const blank=()=>({revision:0,briefs:[],reviews:[],timeline:{clips:[],audioAssetId:null},events:[],renders:[]});
 export function createProductionStore({root,workspace,assets,execImpl=exec}){
  const folder=resolve(root),file=join(folder,'production.json');let projects={},chain=Promise.resolve(),renderBusy=false;
+ const renderSources=new Set();
  const serial=fn=>{const p=chain.then(fn);chain=p.catch(()=>{});return p;};
  async function persist(){const path=file+'.'+randomBytes(8).toString('hex')+'.tmp',f=await open(path,'wx',0o600);try{await f.writeFile(JSON.stringify({schema:1,projects}));await f.sync();}finally{await f.close();}await rename(path,file);}
  async function context(){const saved=await workspace.read(),w=saved?.workspace;return {w,key:saved?.projectId||null,hash:w?portableHash(w.input):null};}
@@ -47,10 +48,28 @@ export function createProductionStore({root,workspace,assets,execImpl=exec}){
    await serial(async()=>{const p=projects[key],j=p.renders.find(x=>x.id===job.id);Object.assign(j,{status:'ready',bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),duration,finishedAt:new Date().toISOString()});event(p,'Render film lokal selesai');await persist();});
   }catch{
    await serial(async()=>{const p=projects[key],j=p.renders.find(x=>x.id===job.id);j.status='failed';j.errorCode='LOCAL_RENDER_FAILED_CHECK_FFMPEG_AND_MEDIA';event(p,'Render lokal gagal; aset sumber tetap tersimpan');await persist();});
-  }finally{await rm(temporary,{recursive:true,force:true});renderBusy=false;}
+  }finally{await rm(temporary,{recursive:true,force:true});renderSources.clear();renderBusy=false;}
  }
  const api={
   async init(){await mkdir(folder,{recursive:true,mode:0o700});try{const d=JSON.parse(await readFile(file,'utf8'));if(d.schema!==1||!d.projects||Array.isArray(d.projects))throw bad('PRODUCTION_STORE_INVALID');projects=d.projects;let changed=false;for(const p of Object.values(projects))for(const j of p.renders||[])if(j.status==='rendering'){j.status='interrupted';j.errorCode='LOCAL_RENDER_INTERRUPTED';changed=true;}if(changed)await persist();}catch(e){if(e.code!=='ENOENT')throw e;await persist();}},
+  isRenderSource(id){return renderSources.has(id);},
+  async pruneMissingAssets(){return serial(async()=>{
+   const next={...projects};
+   let changed=false;
+   for(const [key,p] of Object.entries(projects)){
+    const reviews=p.reviews.filter(r=>assets.resolveAsset(r.assetId));
+    const clips=p.timeline.clips.filter(c=>assets.resolveAsset(c.assetId));
+    const audioAssetId=assets.resolveAsset(p.timeline.audioAssetId)?p.timeline.audioAssetId:null;
+    if(reviews.length===p.reviews.length&&clips.length===p.timeline.clips.length&&audioAssetId===p.timeline.audioAssetId)continue;
+    next[key]={...p,reviews,timeline:{clips,audioAssetId},events:[...p.events]};
+    event(next[key],'Referensi aset yang sudah dihapus dilepas dari proyek');
+    changed=true;
+   }
+   if(changed){
+    const previous=projects;projects=next;
+    try{await persist();}catch(error){projects=previous;throw error;}
+   }
+  });},
   async state(){await chain;const {w,key,hash}=await context(),p=clone(projects[key]||blank());const signature=renderSignature(p,hash);return {...p,projectHash:hash,projectId:key,projectName:w?.input.projectName||null,shotCount:w?.plan.shots.length||0,approvedAssets:p.reviews.filter(r=>approved(p,r.assetId,hash)).length,renders:p.renders.map(j=>({...j,current:j.signature===signature})),paidCalls:0};},
   async brief(input){return mutate(input,(p,w)=>{
    if(!['image','motion'].includes(input.kind))throw bad('BRIEF_KIND_INVALID');
@@ -72,8 +91,10 @@ export function createProductionStore({root,workspace,assets,execImpl=exec}){
   async render(input){
    if(renderBusy)throw bad('RENDER_BUSY',409);let start,acquired=false;
    const state=await mutate(input,(p,w,hash)=>{if(renderBusy)throw bad('RENDER_BUSY',409);if(!p.timeline.clips.length)throw bad('TIMELINE_EMPTY');for(const id of [...p.timeline.clips.map(c=>c.assetId),...(p.timeline.audioAssetId?[p.timeline.audioAssetId]:[])])if(!approved(p,id,hash))throw bad('MEDIA_REVIEW_REQUIRED',409);
-    const job={id:randomBytes(12).toString('hex'),status:'rendering',signature:renderSignature(p,hash),projectHash:hash,createdAt:new Date().toISOString(),source:'local_edit',paidCalls:0};p.renders.unshift(job);p.renders=p.renders.slice(0,30);event(p,'Render film lokal dimulai');start={job,timeline:clone(p.timeline)};renderBusy=true;acquired=true;
-   }).catch(e=>{if(acquired)renderBusy=false;throw e;});
+    const job={id:randomBytes(12).toString('hex'),status:'rendering',signature:renderSignature(p,hash),projectHash:hash,createdAt:new Date().toISOString(),source:'local_edit',paidCalls:0};p.renders.unshift(job);p.renders=p.renders.slice(0,30);event(p,'Render film lokal dimulai');start={job,timeline:clone(p.timeline)};for(const clip of p.timeline.clips)renderSources.add(clip.assetId);
+    if(p.timeline.audioAssetId)renderSources.add(p.timeline.audioAssetId);
+    renderBusy=true;acquired=true;
+   }).catch(e=>{if(acquired){renderBusy=false;renderSources.clear();}throw e;});
    void runRender(state.projectId,start.job,start.timeline);return state;
   },
   async media(id){if(!/^[a-f0-9]{24}$/.test(id))throw bad('RENDER_NOT_FOUND',404);const {key}=await context(),p=projects[key],j=p?.renders.find(x=>x.id===id&&x.status==='ready');if(!j)throw bad('RENDER_NOT_FOUND',404);const path=join(folder,id+'.mp4'),s=await stat(path);if(s.size!==j.bytes)throw bad('RENDER_INTEGRITY_FAILED',409);return {path,size:s.size,stream:createReadStream(path)};},
