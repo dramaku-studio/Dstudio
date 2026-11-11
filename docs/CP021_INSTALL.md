@@ -2,7 +2,7 @@
 
 ## Instalasi per komputer
 1. Instal Node.js 24 LTS (22 juga diuji), Git, FFmpeg dan FFprobe. Pastikan `node --version`, `npm --version`, `ffmpeg -version`, `ffprobe -version` berjalan di terminal baru.
-2. Clone `https://github.com/warkai-id/dramasakustudio.git` lalu `cd dramasakustudio`. Repo privat: akun anggota tim harus diberi akses. Alternatif: unduh ZIP v0.8.0 dari Releases dan ekstrak.
+2. Clone `https://github.com/dramaku-studio/Dstudio.git` lalu `cd Dstudio`. Untuk rilis historis, lihat [ZIP v0.8.0](https://github.com/warkai-id/dramasakustudio/releases/tag/v0.8.0).
 3. Jalankan `npm run dev`. Mode console lokal tidak memerlukan npm install, Docker atau PostgreSQL.
 4. Buka http://127.0.0.1:4184 dan untuk versi main, masuk dengan password awal 654321 dan gunakan Pengaturan → Ganti Password. ZIP rilis v0.8.0 masih memakai kode operator dari terminal. Terminal tetap berjalan; Ctrl+C untuk berhenti.
 

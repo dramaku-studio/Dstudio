@@ -1,5 +1,7 @@
 # Dramasaku Studio — CP022 AIIDE Model Plaza (0.8.0)
 
+Repositori utama untuk pembaruan tim adalah [dramaku-studio/Dstudio](https://github.com/dramaku-studio/Dstudio). [Checkpoint CP027](checkpoints/CP027_REPO_BASELINE.md).
+
 ## Akses tim lokal
 
 Jalankan `npm run dev`. Masuk dengan password awal `654321`. Di **Pengaturan → Ganti Password**, isi password lama dan password baru minimal enam karakter yang mencakup huruf, angka, dan simbol. Password berlaku bersama untuk instalasi ini. Setelah diganti, seluruh sesi masuk kembali.
@@ -10,7 +12,7 @@ Di **Kunci API**, tempel key. Format OpenAI Project/Service Account dan Google A
 **Panduan PDF untuk tim:** [Instalasi Dramasaku v0.8.0 - Windows/macOS](docs/guides/Panduan_Install_Dramasaku_Studio_v0.8.0.pdf). Mulai dengan tes lokal; jangan generate berbayar sebelum persetujuan. PDF dan ZIP aplikasi juga tersedia bersama di [rilis v0.8.0](https://github.com/warkai-id/dramasakustudio/releases/tag/v0.8.0).
 
 Untuk tim yang bekerja di komputer masing-masing dan bertukar berkas proyek.
-Jalankan `npm run dev`, buka `http://127.0.0.1:4184`, lalu masukkan kode akses dari terminal sendiri. Node.js 22/24 dan FFmpeg + FFprobe di PATH diperlukan. Mode lokal tidak memerlukan npm install atau PostgreSQL.
+Jalankan `npm run dev`, buka `http://127.0.0.1:4184`, lalu masukkan password tim. Node.js 22/24 dan FFmpeg + FFprobe di PATH diperlukan. Mode lokal tidak memerlukan npm install atau PostgreSQL.
 
 Integrasi CP022 menambahkan enam model Dreamina/Seedance Mini/2.5, daftar model akun, dan pemindahan key yang belum digunakan ke kelompok Video. [Detail integrasi dan batas parameter](docs/CP022_AIIDE_MODEL_PLAZA.md).
 
