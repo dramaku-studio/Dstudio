@@ -1,5 +1,12 @@
 # Dramasaku Studio — CP022 AIIDE Model Plaza (0.8.0)
 
+## Akses tim lokal
+
+Jalankan `npm run dev`. Masuk dengan password awal `654321`. Di **Pengaturan → Ganti Password**, isi password lama dan password baru minimal enam karakter yang mencakup huruf, angka, dan simbol. Password berlaku bersama untuk instalasi ini. Setelah diganti, seluruh sesi masuk kembali.
+
+Di **Kunci API**, tempel key. Format OpenAI Project/Service Account dan Google API key tertentu dikenali otomatis. Untuk format ambigu, pilih penerbit sebelum pemeriksaan katalog. AIIDE, OpenAI dan Google mendukung pemeriksaan katalog. Engine video berbayar menggunakan AIIDE dengan konfirmasi biaya per permintaan.
+
+
 **Panduan PDF untuk tim:** [Instalasi Dramasaku v0.8.0 - Windows/macOS](docs/guides/Panduan_Install_Dramasaku_Studio_v0.8.0.pdf). Mulai dengan tes lokal; jangan generate berbayar sebelum persetujuan. PDF dan ZIP aplikasi juga tersedia bersama di [rilis v0.8.0](https://github.com/warkai-id/dramasakustudio/releases/tag/v0.8.0).
 
 Untuk tim yang bekerja di komputer masing-masing dan bertukar berkas proyek.
@@ -25,7 +32,7 @@ Catatan checkpoint di bawah adalah riwayat versi lama dan tidak menggantikan pan
 
 # DRAMASAKU STUDIO — CP-012 Unified Creative UI (CP-001 → CP-012)
 
-**One local application:** `npm run dev` → `http://127.0.0.1:4184`. Node.js 22+ required. Use the one-time operator code shown by the startup script. This local dashboard is a pilot, **not** public production.
+**One local application:** `npm run dev` → `http://127.0.0.1:4184`. Node.js 22+ required. Use the initial team password 654321 and change it in Settings. This local dashboard is a pilot, **not** public production.
 
 **New:** Clean creative-facing copy, Indonesian/English interface selector, Video prompt language ID/EN (draft metadata only), separate Help & Terms section, two encrypted multi-key groups for Creative AI (Text + Image) and Video AI (Seedance/other providers), provider-aware routing simulation, local daily request caps, per-key priority and round robin selection. No live billable request is possible from this console.
 
@@ -35,7 +42,7 @@ Catatan checkpoint di bawah adalah riwayat versi lama dan tidak menggantikan pan
 
 # DRAMASAKU STUDIO — CP-011 Unified UI (CP-001 → CP-010)
 
-**Current default UI:** `npm run dev` or `npm run console:start` → `http://127.0.0.1:4184` (same Node.js operator app, one screen and one port). No dependencies required for this local mode. Use the operator token printed in the terminal.
+**Current default UI:** `npm run dev` or `npm run console:start` → `http://127.0.0.1:4184` (same Node.js operator app, one screen and one port). No dependencies required for this local mode. Use the team password.
 
 Menu: Overview, Projects & Story, Storyboard & DNA, Image, Video Generate (Seedance CP-010 controls), Motion, Voice, Film & Render, Automation Workflow, Approvals, History, API & Credentials, Security & Live Gates.
 

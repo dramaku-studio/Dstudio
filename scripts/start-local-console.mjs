@@ -1,4 +1,6 @@
 /** Convenience bootstrap for DEV ONLY. Generates local credentials ONCE in ignored 0600 file. */
+import {existsSync} from 'node:fs';
+import {delimiter} from 'node:path';
 import {mkdir,open,readFile} from 'node:fs/promises';
 import {createHash,randomBytes} from 'node:crypto';
 import {resolve,dirname} from 'node:path';
@@ -17,14 +19,17 @@ async function secrets(){
  const data=JSON.parse(await readFile(file,'utf8'));if(data.version!==1||typeof data.token!=='string'||data.token.length<20)throw Error('Invalid local operator secrets');
  return data;
 }
+// Desktop launches may omit package-manager paths. Keep the user's PATH first.
+const mediaDirs=process.platform==='darwin'?['/opt/homebrew/bin','/usr/local/bin','/Applications/CapCut.app/Contents/Resources']:[];
+process.env.PATH=[process.env.PATH||'',...mediaDirs.filter(dir=>existsSync(resolve(dir,'ffprobe')))].join(delimiter);
 const s=await secrets();const port=Number(process.env.PORT||4184);
 if(!Number.isInteger(port)||port<1024||port>65535)throw Error('PORT must be 1024..65535');
 // CP021: validated AIIDE video credentials enable manual paid submission. Offline mode remains available.
-const app=createLocalConsole({port,adminToken:s.token,vaultKey:s.key,vaultFile:resolve(root,'.local-private','credentials.enc.json'),liveEnabled:false,capabilityVerified:false,aiideAutoActivate:process.env.STUDIO_OFFLINE!=='1',aiideVideoEnabled:false,aiideVideoCapabilityVerified:false,aiideReadOnlyEnabled:true,aiideMediaHosts:(process.env.DRAMASAKU_AIIDE_MEDIA_HOSTS||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean),ttsEnabled:false,ttsCapabilityVerified:false,aiideTtsCapabilityVerified:false});
+const app=createLocalConsole({port,teamLogin:true,adminToken:s.token,vaultKey:s.key,vaultFile:resolve(root,'.local-private','credentials.enc.json'),liveEnabled:false,capabilityVerified:false,aiideAutoActivate:process.env.STUDIO_OFFLINE!=='1',aiideVideoEnabled:false,aiideVideoCapabilityVerified:false,aiideReadOnlyEnabled:true,aiideMediaHosts:(process.env.DRAMASAKU_AIIDE_MEDIA_HOSTS||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean),ttsEnabled:false,ttsCapabilityVerified:false,aiideTtsCapabilityVerified:false});
 await app.listen();
 console.log('\nDRAMASAKU LOCAL OPERATOR CONSOLE (DEVELOPMENT ONLY)');
 console.log(`Open: http://127.0.0.1:${port}`);
-console.log(`Operator token (use on your own machine only): ${s.token}`);
+console.log('Masuk dengan password tim. Password awal 654321 berlaku sampai diganti di Pengaturan.');
 console.log('Never share the token or API keys in chat, screenshots, or GitHub.');
 if(process.platform==='win32')console.warn('Windows: review NTFS permissions on .local-private (this console only binds to localhost).');
 console.log('Paid video pilot: '+((await app.live.list()).enabled && (await app.live.list()).capabilityVerified ? 'OPT-IN (1 submission/day; no auto retry)' : 'DISABLED (default)'));

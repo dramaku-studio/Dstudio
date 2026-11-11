@@ -69,6 +69,7 @@ export function compileAiideRequest(input,resolveAsset=()=>null,{forDispatch=fal
  if(input.generateAudio&&!model.supportsAudio)bad('AIIDE_AUDIO_CONTROL_UNSUPPORTED');
  if(input.watermark&&!model.supportsWatermark)bad('AIIDE_WATERMARK_CONTROL_UNSUPPORTED');
  const refs=input.assets??[];if(!Array.isArray(refs)||refs.length>15)bad('INVALID_ASSETS');
+ let audioBytes=0;
  const seen=new Set(),counts={image:0,video:0,audio:0},roles={},missing=[],resolved=[];
  for(const ref of refs){
   if(!ref||seen.has(ref.assetId))bad('DUPLICATE_ASSET');seen.add(ref.assetId);
@@ -76,6 +77,10 @@ export function compileAiideRequest(input,resolveAsset=()=>null,{forDispatch=fal
   const allowed={image:['first_frame','last_frame','reference_image'],video:['reference_video'],audio:['reference_audio']}[a.kind];
   if(!allowed?.includes(ref.role))bad('ASSET_ROLE_MISMATCH');
   counts[a.kind]++;roles[ref.role]=(roles[ref.role]||0)+1;
+  if(a.kind!=='image'&&a.bytes>5*1024*1024)bad('REFERENCE_FILE_MAX_5MB');
+  if(a.kind==='audio')audioBytes+=a.bytes||0;
+  if(a.kind==='audio'&&a.mime&&a.mime!=='audio/mpeg')bad('REFERENCE_AUDIO_MP3_REQUIRED');
+
   let url=a.providerReference||null;
   if(url)url=validateProviderReference(url,{allowAsset:model.family==='seedance'});
   if(!url){missing.push(a.id);url=mockReferences?`https://contract-fixture.example/${a.id}.${a.kind==='image'?'png':a.kind==='video'?'mp4':'mp3'}`:`LOCAL_ASSET_NOT_STAGED:${a.id}`;}
@@ -91,6 +96,10 @@ export function compileAiideRequest(input,resolveAsset=()=>null,{forDispatch=fal
   }
   resolved.push({assetId:a.id,role:ref.role,kind:a.kind,url,sha256:a.sha256,durationSeconds:a.durationSeconds||0});
  }
+ if(audioBytes>5*1024*1024)bad('REFERENCE_AUDIO_MAX_5MB');
+ if(counts.image>10)bad('REF_LIMIT');
+ if(resolved.filter(a=>a.kind==='audio').reduce((sum,a)=>sum+a.durationSeconds,0)>30.001)bad('REFERENCE_AUDIO_TOTAL_DURATION');
+ if(resolved.filter(a=>a.kind==='video').reduce((sum,a)=>sum+a.durationSeconds,0)>30.001)bad('REFERENCE_VIDEO_TOTAL_DURATION');
  if(counts.image>model.maxImages||counts.video>model.maxVideos||counts.audio>model.maxAudios)bad('REF_LIMIT');
  if(input.mode==='text_to_video'&&refs.length)bad('UNEXPECTED_REFERENCES');
  if(input.mode==='image_to_video'&&(refs.length!==1||roles.first_frame!==1))bad('FIRST_FRAME_REQUIRED');

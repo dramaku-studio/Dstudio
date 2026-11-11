@@ -2,7 +2,7 @@
 let internalState=null,internalTimeline=[],internalAudio=null,internalDirty=false,internalPoll=null,internalSystem=null;
 function studioError(error){
  const code=typeof error==='string'?error:error.message;
- const messages={AUTH_REQUIRED:'Sesi berakhir. Masuk kembali; salin isian yang belum tersimpan.',PROJECT_NOT_SAVED:'Simpan proyek terlebih dahulu.',PROJECT_CHANGED_RELOAD:'Cerita berubah di tab lain. Muat cerita terbaru sebelum menyimpan.',PRODUCTION_CHANGED_RELOAD:'Pekerjaan berubah di tab lain. Klik Periksa Status Lokal lalu ulangi setelah meninjau perubahan.',AIIDE_MODEL_NOT_DOCUMENTED:'Model ini belum punya profil AIIDE yang didokumentasikan.',AIIDE_MODE_NOT_SUPPORTED:'Mode ini tidak didukung profil model terpilih.',INVALID_PROMPT:'Prompt wajib diisi, maksimal 4.000 karakter.',INVALID_DURATION:'Durasi tidak sesuai batas model.',UNSUPPORTED_RESOLUTION:'Resolusi tidak sesuai kontrak model.',UNEXPECTED_REFERENCES:'Text → Video harus tanpa referensi. Lepaskan referensi atau pilih mode lain.',FIRST_FRAME_REQUIRED:'Lampirkan tepat satu gambar dengan peran First frame.',FIRST_LAST_REQUIRED:'Lampirkan satu First frame dan satu Last frame.',REFERENCE_REQUIRED:'Lampirkan referensi gambar/video sesuai model; audio saja tidak cukup.',REFERENCE_VIDEO_REQUIRED:'Edit video memerlukan tepat satu video referensi.',REF_LIMIT:'Jumlah referensi melebihi batas model.',ASSET_ROLE_MISMATCH:'Peran referensi tidak cocok dengan jenis aset.',REFERENCE_VIDEO_DURATION:'Durasi video referensi tidak sesuai model.',REFERENCE_VIDEO_TOTAL_DURATION:'Total video referensi maksimal 15 detik.',REFERENCE_IMAGE_TOO_SMALL:'Gambar terlalu kecil untuk model ini.',REFERENCE_VIDEO_DIMENSIONS:'Ukuran, rasio, atau frame rate video tidak sesuai model.',REFERENCE_DIMENSIONS:'Dimensi referensi tidak sesuai profil model.',AIIDE_REFERENCE_PUBLIC_HTTPS_REQUIRED:'Gunakan URL HTTPS publik atau ID aset AIIDE yang valid. Alamat lokal tidak dapat digunakan provider.',AIIDE_REFERENCE_INVALID:'Alamat referensi tidak valid.',MEDIA_UNREADABLE_OR_FFPROBE_MISSING:'Media belum dapat dibaca. Periksa file dan ketersediaan FFprobe di Status Studio.',CLIP_RANGE_INVALID:'Rentang klip tidak valid. Periksa titik mulai dan durasi sumber.',MEDIA_REVIEW_REQUIRED:'Setujui semua gambar, klip, dan audio pada Persetujuan untuk versi cerita ini.',TIMELINE_EMPTY:'Tambahkan dan simpan klip lebih dahulu.',TIMELINE_MAX_300_SECONDS:'Total susunan maksimal 300 detik.',RENDER_BUSY:'Render lokal masih berjalan. Tunggu hasilnya.',PRODUCTION_TEXT_INVALID:'Lengkapi nama peninjau atau teks; periksa batas panjang isian.',PACKAGE_INTEGRITY_INVALID:'Paket rusak atau telah berubah. Minta ekspor ulang dari pengirim.',PACKAGE_MAX_64_MB:'Total media paket melebihi 64 MB.',PACKAGE_ASSET_INTEGRITY:'Ukuran atau checksum media paket tidak sesuai.'};
+ const messages={REFERENCE_FILE_MAX_5MB:'Audio/video maksimal 5 MB per file.',REFERENCE_AUDIO_MAX_5MB:'Total ukuran audio maksimal 5 MB.',REFERENCE_AUDIO_MP3_REQUIRED:'Audio referensi harus MP3.',REFERENCE_AUDIO_TOTAL_DURATION:'Total durasi semua audio maksimal 30 detik.',AUTH_REQUIRED:'Sesi berakhir. Masuk kembali; salin isian yang belum tersimpan.',PROJECT_NOT_SAVED:'Simpan proyek terlebih dahulu.',PROJECT_CHANGED_RELOAD:'Cerita berubah di tab lain. Muat cerita terbaru sebelum menyimpan.',PRODUCTION_CHANGED_RELOAD:'Pekerjaan berubah di tab lain. Klik Periksa Status Lokal lalu ulangi setelah meninjau perubahan.',AIIDE_MODEL_NOT_DOCUMENTED:'Model ini belum punya profil AIIDE yang didokumentasikan.',AIIDE_MODE_NOT_SUPPORTED:'Mode ini tidak didukung profil model terpilih.',INVALID_PROMPT:'Prompt wajib diisi, maksimal 4.000 karakter.',INVALID_DURATION:'Durasi tidak sesuai batas model.',UNSUPPORTED_RESOLUTION:'Resolusi tidak sesuai kontrak model.',UNEXPECTED_REFERENCES:'Text → Video harus tanpa referensi. Lepaskan referensi atau pilih mode lain.',FIRST_FRAME_REQUIRED:'Lampirkan tepat satu gambar dengan peran First frame.',FIRST_LAST_REQUIRED:'Lampirkan satu First frame dan satu Last frame.',REFERENCE_REQUIRED:'Lampirkan referensi gambar/video sesuai model; audio saja tidak cukup.',REFERENCE_VIDEO_REQUIRED:'Edit video memerlukan tepat satu video referensi.',REF_LIMIT:'Jumlah referensi melebihi batas model.',ASSET_ROLE_MISMATCH:'Peran referensi tidak cocok dengan jenis aset.',REFERENCE_VIDEO_DURATION:'Durasi video referensi tidak sesuai model.',REFERENCE_VIDEO_TOTAL_DURATION:'Total video referensi maksimal 15 detik.',REFERENCE_IMAGE_TOO_SMALL:'Gambar terlalu kecil untuk model ini.',REFERENCE_VIDEO_DIMENSIONS:'Ukuran, rasio, atau frame rate video tidak sesuai model.',REFERENCE_DIMENSIONS:'Dimensi referensi tidak sesuai profil model.',AIIDE_REFERENCE_PUBLIC_HTTPS_REQUIRED:'Gunakan URL HTTPS publik atau ID aset AIIDE yang valid. Alamat lokal tidak dapat digunakan provider.',AIIDE_REFERENCE_INVALID:'Alamat referensi tidak valid.',MEDIA_UNREADABLE_OR_FFPROBE_MISSING:'Media belum dapat dibaca. Periksa file dan ketersediaan FFprobe di Status Studio.',CLIP_RANGE_INVALID:'Rentang klip tidak valid. Periksa titik mulai dan durasi sumber.',MEDIA_REVIEW_REQUIRED:'Setujui semua gambar, klip, dan audio pada Persetujuan untuk versi cerita ini.',TIMELINE_EMPTY:'Tambahkan dan simpan klip lebih dahulu.',TIMELINE_MAX_300_SECONDS:'Total susunan maksimal 300 detik.',RENDER_BUSY:'Render lokal masih berjalan. Tunggu hasilnya.',PRODUCTION_TEXT_INVALID:'Lengkapi nama peninjau atau teks; periksa batas panjang isian.',PACKAGE_INTEGRITY_INVALID:'Paket rusak atau telah berubah. Minta ekspor ulang dari pengirim.',PACKAGE_MAX_64_MB:'Total media paket melebihi 64 MB.',PACKAGE_ASSET_INTEGRITY:'Ukuran atau checksum media paket tidak sesuai.'};
  return messages[code]||`Belum berhasil: ${code}`;
 }
 const internalNode=(tag,text,className)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(className)el.className=className;return el;};
@@ -25,7 +25,7 @@ async function internalUpload(inputId,statusId){
 function internalPaintMedia(){
  const images=$('image-library'),voices=$('voice-library');images.replaceChildren();voices.replaceChildren();
  for(const a of sdAssets){
-  if(a.kind==='image'){const card=internalNode('article',undefined,'internal-media-card');card.append(internalMedia(a),internalNode('strong',a.name),internalButton('Gunakan sebagai Frame Awal',()=>{internalSelectMode('image_to_video');sdChosen=[{assetId:a.id,role:'first_frame'}];sdRevise();}));images.append(card);}
+  if(a.kind==='image'){const card=internalNode('article',undefined,'internal-media-card');card.append(internalMedia(a),internalNode('strong',a.name),internalButton('Gunakan sebagai Frame Awal',()=>{if(!internalSelectMode('image_to_video'))return;sdChosen=[{assetId:a.id,role:'first_frame'}];sdRevise();}));images.append(card);}
   if(a.kind==='audio'){const card=internalNode('article',undefined,'internal-media-card');card.append(internalNode('strong',a.name),internalMedia(a));voices.append(card);}
  }
  if(!images.children.length)images.textContent='Belum ada gambar lokal.';if(!voices.children.length)voices.textContent='Belum ada audio lokal.';
@@ -34,14 +34,23 @@ function internalPaintMedia(){
  if(internalState)internalPaintReviews();
 }
 function internalSelectMode(mode){
- const model=sdCurrent()?.modes.includes(mode)?sdCurrent():sdCatalog?.models.find(m=>m.modes.includes(mode));
+ const choices=(sdCatalog?.models||[]).filter(model=>model.modes.includes(mode));
+ const entitled=choices.filter(model=>sdLiveConfiguration?.availableModels?.includes(model.id));
+ const candidates=entitled.length?entitled:choices;
+ const model=candidates.find(model=>model.id===$('sd-model').value)||candidates[0];
  if(!model){$('motion-status').textContent='Mode ini belum didokumentasikan AIIDE.';return false;}
- $('sd-model').value=model.id;sdRevise();$('sd-mode').value=mode;sdRevise();openView('video-studio');sdText('sd-plan-status','Siapkan referensi, lalu Uji Mode Lokal. Generate AI memerlukan key valid dan persetujuan biaya.');return true;
+ const before=sdTags();
+ $('sd-model').value=model.id;
+ sdOptions('sd-mode',sdCatalog.modes,mode);
+ sdRevise();
+ sdRemapPromptTags(before);
+ sdText('sd-live-status',videoLiveHelp(sdLiveConfiguration));
+ openView('video-studio');sdText('sd-plan-status','Siapkan referensi, lalu Uji Mode Lokal. Generate AI memerlukan key valid dan persetujuan biaya.');return true;
 }
 function internalPaintBriefs(){
  for(const [kind,id,target] of [['image','image-briefs','image-prompt'],['motion','motion-briefs','motion-prompt']]){
   const list=$(id);list.replaceChildren();for(const b of internalState.briefs.filter(b=>b.kind===kind)){
-   const row=internalNode('div',undefined,'activity-item');row.append(internalNode('span',`${b.shotId||'Draf'} · ${new Date(b.createdAt).toLocaleString()}`),internalButton('Buka Draf',()=>{if($(target).value.trim()&&!confirm('Ganti isian yang belum disimpan dengan draf ini?'))return;$(target).value=b.prompt;if(kind==='image')$('image-shot').value=b.shotId||'';}));list.append(row);
+   const row=internalNode('div',undefined,'activity-item');row.append(internalNode('span',`${b.shotId||'Draf'} · ${new Date(b.createdAt).toLocaleString()}`),internalButton('Buka Draf',()=>{if($(target).value.trim()&&!confirm('Ganti isian yang belum disimpan dengan draf ini?'))return;$(target).value=b.prompt;if(kind==='image'){$('image-shot').value=b.shotId||'';updatePromptCount('image-prompt');}}));list.append(row);
   }
  }
 }
@@ -55,9 +64,37 @@ function internalPaintReviews(){
   card.append(internalMedia(a),internalNode('strong',a.name),internalNode('p',r?(current?(r.decision==='approved'?'Disetujui':'Perlu revisi'):'Review versi cerita sebelumnya')+` · ${r.reviewer}`:'Belum ditinjau'));
   if(r?.note)card.append(internalNode('p',r.note));
   const action=decision=>internalChange('review',{assetId:a.id,decision,reviewer:$('reviewer-name').value,note:$('review-note').value},'review-status');
-  card.append(internalButton('Setujui Aset',()=>action('approved')),internalButton('Minta Revisi',()=>action('revision')));grid.append(card);
+  card.append(internalButton('Setujui Aset',()=>action('approved')),internalButton('Minta Revisi',()=>action('revision')));
+  if(current&&r.decision==='approved'&&a.kind!=='audio'){
+   card.append(internalButton('Pakai di Studio Film',()=>{
+    $('film-asset').value=a.id;$('film-asset').dispatchEvent(new Event('change'));openView('film-studio');
+   }));
+  }
+  grid.append(card);
  }
  if(!sdAssets.length)grid.textContent='Impor media dari Studio Gambar, Studio Suara, atau Buat Video terlebih dahulu.';
+}
+function filmRenderHint(){
+ if(!internalState?.projectHash)return 'Simpan proyek di Proyek & Cerita.';
+ if(internalState.renders.some(job=>job.status==='rendering'))return 'Render sedang berjalan.';
+ if(!internalTimeline.length)return 'Tambahkan gambar atau klip ke susunan film.';
+ if(internalDirty)return 'Simpan susunan terbaru sebelum render.';
+ const ids=new Set(internalTimeline.map(clip=>clip.assetId));
+ if(internalAudio)ids.add(internalAudio);
+ const pending=[...ids].filter(id=>{
+  const asset=sdAssets.find(a=>a.id===id);
+  return !asset||!internalState.reviews.some(r=>r.assetId===id&&r.sha256===asset.sha256&&r.projectHash===internalState.projectHash&&r.decision==='approved');
+ });
+ if(pending.length)return 'Tinjau '+pending.length+' aset pada menu Persetujuan.';
+ if(!internalSystem)return 'Memeriksa alat render lokal…';
+ const missing=internalSystem.tools.filter(tool=>!tool.available);
+ if(missing.length)return 'Periksa Status Sistem untuk '+missing.map(tool=>tool.detail||tool.name).join(', ')+'.';
+ return '';
+}
+function internalRenderReadiness(){
+ const hint=filmRenderHint();
+ $('film-generate').disabled=!!hint;
+ $('film-readiness').textContent=hint||'Siap merender MP4 di perangkat ini.';
 }
 function internalPaintTimeline(){
  const list=$('film-timeline');list.replaceChildren();
@@ -66,6 +103,7 @@ function internalPaintTimeline(){
   row.append(internalButton('Naik',()=>move(-1)),internalButton('Turun',()=>move(1)),internalButton('Keluarkan',()=>{internalTimeline.splice(i,1);internalDirty=true;internalPaintTimeline();}));list.append(row);
  });
  $('film-manifest-status').textContent=`${internalTimeline.length} klip · ${Math.round(internalTimeline.reduce((n,c)=>n+c.duration,0)*10)/10} detik · ${internalDirty?'belum disimpan':'tersimpan'}`;
+ internalRenderReadiness();
  if(!internalTimeline.length)list.textContent='Belum ada klip di susunan film.';
 }
 function internalShowRender(r){const url=`/api/production/renders/${r.id}/media`;$('film-player').src=url;$('film-player').load();$('film-download').href=url;$('film-download').hidden=false;$('film-status').textContent=`Film lokal siap · ${r.duration} detik${r.current?'':' · versi sebelumnya'}.`;}
@@ -74,16 +112,50 @@ function internalPaintWorkflow(){
  const grid=$('production-workflow');grid.replaceChildren();for(const [title,status,view] of rows){const c=internalNode('article',undefined,'internal-step');c.append(internalNode('h3',title),internalNode('p',status),internalButton('Buka',()=>openView(view)));grid.append(c);}
  $('stage').textContent=p.projectHash?'Proyek lokal aktif':'Belum ada proyek';$('stagedetail').textContent=p.projectName||'Simpan cerita untuk memulai.';$('shots').textContent=String(p.shotCount);
 }
+let historyDrafts=[];
+function internalPaintHistory(){
+ const term=$('history-search').value.trim().toLowerCase();
+ const matches=value=>value.toLowerCase().includes(term);
+ const modelName=id=>sdCatalog?.models.find(model=>model.id===id)?.label||id;
+ const events=$('history-events'),drafts=$('history-drafts'),jobs=$('history-jobs');
+ for(const list of [events,drafts,jobs])list.replaceChildren();
+ for(const event of internalState?.events||[]){
+  if(!matches(event.label))continue;
+  const row=internalNode('div',undefined,'activity-item');
+  row.append(internalNode('span',event.label),internalNode('small',new Date(event.at).toLocaleString()));events.append(row);
+ }
+ for(const draft of historyDrafts){
+  const label=modelName(draft.model)+' · '+draft.mode;
+  if(!matches(label+' '+draft.model))continue;
+  const row=internalNode('div',undefined,'activity-item');
+  row.append(internalNode('span',label),internalButton('Buka Draf',()=>sdOpenDraft(draft.id)));drafts.append(row);
+ }
+ const filter=$('history-job-filter').value;
+ for(const job of sdLiveConfiguration?.jobs||[]){
+  const group=job.status==='ready'?'ready':sdPollable.has(job.status)&&!job.errorCode?'active':'check';
+  const source=job.source==='imported'?'Task impor':'Generate';
+  const label=[modelName(job.model),job.mode,source,job.status].filter(Boolean).join(' · ');
+  if((filter&&filter!==group)||!matches(label+' '+job.model+' '+(job.providerTaskId||'')))continue;
+  const row=internalNode('div',undefined,'activity-item');row.append(internalNode('span',label));
+  if(job.createdAt)row.append(internalNode('small',new Date(job.createdAt).toLocaleString()));
+  if(group==='ready')row.append(internalButton('Lihat hasil',()=>{openView('video-studio');sdShowPlayer(job);}));
+  jobs.append(row);
+ }
+ if(!events.children.length)events.textContent=term?'Tidak ada aktivitas yang cocok.':'Belum ada aktivitas produksi tersimpan.';
+ if(!drafts.children.length)drafts.textContent=term?'Tidak ada draf yang cocok.':'Belum ada draf video.';
+ if(!jobs.children.length)jobs.textContent=term||filter?'Tidak ada tugas yang cocok.':'Belum ada tugas video di perangkat ini.';
+}
+$('history-search').addEventListener('input',internalPaintHistory);
+$('history-job-filter').addEventListener('change',internalPaintHistory);
 async function internalReload(){
  const state=await api('/api/production'),previous=internalState;internalState=state;
  if(previous?.projectId!==state.projectId){$('film-player').pause();$('film-player').removeAttribute('src');$('film-player').load();$('film-download').hidden=true;}
  if(!internalDirty||previous?.projectId!==state.projectId){internalTimeline=structuredClone(state.timeline.clips);internalAudio=state.timeline.audioAssetId;internalDirty=false;}
  sdOptions('image-shot',[{id:'',label:'Tanpa shot'},...(activeWorkspace?.plan.shots||[]).map(s=>({id:s.id,label:`${s.id} · ${s.description.slice(0,70)}`}))],$('image-shot').value);
  internalPaintBriefs();internalPaintMedia();internalPaintTimeline();internalPaintWorkflow();
- const history=$('history-events');history.replaceChildren();for(const e of state.events){const row=internalNode('div',undefined,'activity-item');row.append(internalNode('span',e.label),internalNode('small',new Date(e.at).toLocaleString()));history.append(row);}if(!state.events.length)history.textContent='Belum ada aktivitas produksi tersimpan.';
- const drafts=await api('/api/aiide-video/drafts'),list=$('history-drafts');list.replaceChildren();for(const d of drafts.jobs){const row=internalNode('div',undefined,'activity-item');row.append(internalNode('span',`${sdCatalog?.models.find(m=>m.id===d.model)?.label||d.model} · ${d.mode}`),internalButton('Buka Draf',()=>sdOpenDraft(d.id)));list.append(row);}if(!drafts.jobs.length)list.textContent='Belum ada draf video.';
  const renders=$('film-renders');renders.replaceChildren();for(const r of state.renders){const row=internalNode('div',undefined,'activity-item');row.append(internalNode('span',`${r.status==='ready'?'Selesai':r.status==='rendering'?'Sedang merender':r.status} · ${new Date(r.createdAt).toLocaleString()}${r.current?'':' · versi sebelumnya'}`));if(r.status==='ready')row.append(internalButton('Lihat Film',()=>internalShowRender(r)));renders.append(row);}
- const active=state.renders.find(r=>r.status==='rendering');$('film-generate').disabled=!!active||!state.projectHash;
+ const active=state.renders.find(r=>r.status==='rendering');
+ internalPaintHistory();
  if(active)$('film-status').textContent='Merender aset lokal… tidak ada request AI.';
  else if(state.renders[0]?.status==='failed')$('film-status').textContent='Render gagal. Periksa FFmpeg dan media pada Status Studio. Sumber tetap tersimpan.';
  else if(state.renders[0]?.status==='ready'&&!$('film-player').getAttribute('src'))internalShowRender(state.renders[0]);
@@ -92,8 +164,9 @@ async function internalReload(){
 }
 async function internalReadiness(){
  internalSystem=await api('/api/studio/status');const s=internalSystem,ready=s.tools.every(t=>t.available),grid=$('studio-readiness');grid.replaceChildren();
- const rows=[['Cerita & storyboard','Siap lokal: simpan, edit, impor/ekspor cerita.'],['Video AIIDE',`${s.modelCount} profil model; validasi, draf, tes transport lokal. Generate berbayar ${s.paidVideoEnabled?'AKTIF':'OFF'}.`],['Gambar & gerak','Draf, referensi lokal, dan kirim ke mode video yang sesuai. Generate gambar AI OFF.'],['Suara','Draf narasi dan impor MP3/WAV tersedia. Generate TTS '+(s.paidTtsEnabled?'AKTIF.':'OFF.')],['Review & riwayat','Tersimpan lintas restart; review mengikuti versi cerita dan aset.'],['Film lokal',ready?'FFmpeg/FFprobe tersedia; susun dan render media yang disetujui.':'Belum siap render: pasang '+s.tools.filter(t=>!t.available).map(t=>t.name).join(', ')+'.'],['Berbagi proyek','Paket lintas Dramasaku/Aragi; media maksimal 64 MB. Kredensial tidak disertakan.'],['Lingkup penggunaan','Satu operator per komputer. Berbagi paket secara manual; bukan server multiuser.']];
+ const rows=[['Cerita & storyboard','Siap lokal: simpan, edit, impor/ekspor cerita.'],['Video AIIDE',`${s.modelCount} profil model; validasi, draf, tes transport lokal. Generate berbayar ${s.paidVideoEnabled?'AKTIF':'OFF'}.`],['Gambar & gerak','Draf, referensi lokal, dan kirim ke mode video yang sesuai. Generate gambar AI OFF.'],['Suara','Draf narasi dan impor MP3/WAV tersedia. Generate TTS '+(s.paidTtsEnabled?'AKTIF.':'OFF.')],['Review & riwayat','Tersimpan lintas restart; review mengikuti versi cerita dan aset.'],['Film lokal',ready?'FFmpeg/FFprobe tersedia; susun dan render media yang disetujui.':'Belum siap render: pasang '+s.tools.filter(t=>!t.available).map(t=>t.detail||t.name).join(', ')+'.'],['Berbagi proyek','Paket lintas Dramasaku/Aragi; media maksimal 64 MB. Kredensial tidak disertakan.'],['Lingkup penggunaan','Satu operator per komputer. Berbagi paket secara manual; bukan server multiuser.']];
  for(const [title,detail] of rows){const card=internalNode('article');card.append(internalNode('strong',title),internalNode('p',detail));grid.append(card);}
+ internalRenderReadiness();
  $('studio-status-message').textContent=`Versi ${s.version} · pemeriksaan lokal selesai.`;
 }
 const internalCoreRefresh=refresh;
@@ -102,7 +175,7 @@ const internalTtsLoad=ttsLoad;
 ttsLoad=async function(){await internalTtsLoad();const status=await api('/api/tts/status'),provider=status.providers.find(p=>p.id===$('tts-provider').value);$('tts-generate').disabled=!(provider?.configured&&provider?.liveAvailable&&status.usedToday<status.maxDaily);};
 $('image-generate').onclick=()=>internalChange('brief',{kind:'image',prompt:$('image-prompt').value,shotId:$('image-shot').value||null},'image-status');
 $('motion-save').onclick=()=>internalChange('brief',{kind:'motion',prompt:$('motion-prompt').value},'motion-status');
-$('motion-generate').onclick=()=>{const prompt=$('motion-prompt').value.trim();if(!prompt){$('motion-status').textContent='Tulis arahan gerak terlebih dahulu.';return;}if(internalSelectMode('image_to_video'))$('sd-prompt').value=prompt;};
+$('motion-generate').onclick=()=>{const prompt=$('motion-prompt').value.trim();if(!prompt){$('motion-status').textContent='Tulis arahan gerak terlebih dahulu.';return;}if(internalSelectMode('image_to_video'))transferVideoPrompt(prompt,'motion-status');};
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>internalSelectMode(b.dataset.mode));
 $('image-upload-button').onclick=()=>internalUpload('image-upload','image-status');
 $('voice-upload-button').onclick=()=>internalUpload('voice-upload','tts-message');

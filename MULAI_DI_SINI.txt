@@ -12,7 +12,7 @@ MULAI
    Periksa di terminal: node --version, ffmpeg -version, ffprobe -version.
 3. Buka terminal di folder yang memuat package.json, jalankan: npm run dev
    Tidak perlu npm install untuk aplikasi lokal ini.
-4. Buka http://127.0.0.1:4184 dan masuk memakai kode akses yang tampil di terminal.
+4. Buka http://127.0.0.1:4184 dan masuk memakai password awal 654321. Ganti melalui Pengaturan > Ganti Password.
 5. Hentikan dengan Ctrl+C. Backend hanya menerima koneksi loopback komputer sendiri.
 
 ALUR TIM INTERNAL

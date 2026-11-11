@@ -1,3 +1,4 @@
+import {teamPassword,validTeamPassword} from './team-password.mjs';
 /** Dramasaku local operator console. Loopback-only; paid video/TTS requires explicit opt-in. */
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
@@ -14,6 +15,7 @@ import {createLocalLiveEngine} from './local-live.mjs';
 import {createAiideVideoEngine} from './aiide-video.mjs';
 import {createLocalTtsEngine} from './tts-engine.mjs';
 import {createAiideActivation} from './aiide-activation.mjs';
+import {keyOnboardingInput} from './key-onboarding.mjs';
 import {createProviderConnectionTester} from './provider-connection.mjs';
 import {aiideVideoCatalog,compileAiideRequest} from '../../packages/providers/src/aiide-video-plan.mjs';
 import {testAiideLocally} from './aiide-local-test.mjs';
@@ -22,9 +24,10 @@ import {createProjectPackages} from './project-package.mjs';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const dir=dirname(fileURLToPath(import.meta.url));
-export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=process.env.DRAMASAKU_LOCAL_ADMIN_TOKEN,vaultKey=process.env.DRAMASAKU_VAULT_KEY_B64,vaultFile=process.env.DRAMASAKU_VAULT_FILE||resolve(dir,'../../.local-private/credentials.enc.json'),demo=null,assetRoot,liveEnabled=false,capabilityVerified=false,liveFetchImpl=fetch,aiideAutoActivate=false,aiideVideoEnabled=false,aiideVideoCapabilityVerified=false,aiideReadOnlyEnabled=false,aiideVideoFetchImpl=fetch,aiideMediaHosts=[],ttsEnabled=false,ttsCapabilityVerified=false,aiideTtsCapabilityVerified=false,ttsFetchImpl=fetch,keyTestFetchImpl=fetch}={}){
+export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,adminToken=process.env.DRAMASAKU_LOCAL_ADMIN_TOKEN,vaultKey=process.env.DRAMASAKU_VAULT_KEY_B64,vaultFile=process.env.DRAMASAKU_VAULT_FILE||resolve(dir,'../../.local-private/credentials.enc.json'),demo=null,assetRoot,liveEnabled=false,capabilityVerified=false,liveFetchImpl=fetch,aiideAutoActivate=false,aiideVideoEnabled=false,aiideVideoCapabilityVerified=false,aiideReadOnlyEnabled=false,aiideVideoFetchImpl=fetch,aiideMediaHosts=[],ttsEnabled=false,ttsCapabilityVerified=false,aiideTtsCapabilityVerified=false,ttsFetchImpl=fetch,keyTestFetchImpl=fetch}={}){
  if(!['127.0.0.1','::1'].includes(host))throw Error('Local operator console refuses public bind');
  if(typeof adminToken!=='string'||adminToken.length<20)throw Error('Set DRAMASAKU_LOCAL_ADMIN_TOKEN (20+ chars); not committed to repository');
+ const password=teamLogin?teamPassword(join(dirname(vaultFile),'team-password.json')):null;
  const vault=createEncryptedVault({file:vaultFile,key:vaultKey});
  const keyPools=createEncryptedKeyPools({file:resolve(dirname(vaultFile),'key-pools.enc.json'),key:vaultKey});
  const activation=aiideAutoActivate?createAiideActivation({keyPools,fetchImpl:keyTestFetchImpl}):null;
@@ -39,7 +42,17 @@ export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=proces
  let edits=Promise.resolve();const edit=fn=>{const p=edits.then(fn);edits=p.catch(()=>{});return p;};
  const currentProject=async()=>(await workspace.read())?.projectId||null;
  const inspectInput=async input=>{for(const ref of input?.assets||[])await seedance.inspectAsset(ref.assetId);return input;};
- let toolsStatus=null;const localTools=async()=>toolsStatus??=await Promise.all(['ffmpeg','ffprobe'].map(async command=>{try{await promisify(execFile)(command,['-version'],{timeout:5000,maxBuffer:100000});return {name:command,available:true};}catch{return {name:command,available:false};}}));
+ const localTools=()=>Promise.all(['ffmpeg','ffprobe'].map(async command=>{
+  try{
+   const args=command==='ffmpeg'?['-hide_banner','-encoders']:['-version'];
+   const {stdout}=await promisify(execFile)(command,args,{timeout:5000,maxBuffer:200000});
+   if(command==='ffmpeg'){
+    const missing=['libx264','aac'].filter(codec=>!stdout.split('\n').some(line=>line.trim().split(/\s+/)[1]===codec));
+    if(missing.length)return {name:command,available:false,detail:'FFmpeg dengan encoder '+missing.join(', ')};
+   }
+   return {name:command,available:true};
+  }catch{return {name:command,available:false};}
+ }));
  demo??=createOfflineDemo({getCreativeInput:async()=>(await workspace.read())?.workspace?.input});
  const sessions=new Map(),failed=new Map();const originSet=new Set([`http://127.0.0.1:${port}`,`http://localhost:${port}`,`http://[::1]:${port}`]);
  const denyKey=(a,b)=>{const h1=createHash('sha256').update(String(a)).digest(),h2=createHash('sha256').update(String(b)).digest();return !timingSafeEqual(h1,h2);};
@@ -75,16 +88,31 @@ export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=proces
    const s=session(req);
    if(req.method==='GET'&&p==='/api/session')return send(200,{authenticated:!!s,csrf:s?.csrf??null,offlineOnly:!aiideAutoActivate&&!aiideVideoEnabled&&!liveEnabled&&!ttsEnabled});
    if(req.method==='POST'&&p==='/api/login'){
+     const body=await readJson();
+     return await edit(async()=>{
      const a=failed.get('local')??{count:0,until:0};if(a.count>=5&&a.until>Date.now())return fail(429,'RATE_LIMITED');
-     const body=await readJson();if(typeof body?.token!=='string'||denyKey(body.token,adminToken)){
+     if(typeof body?.token!=='string'||(password?!await password.verify(body.token):denyKey(body.token,adminToken))){
        failed.set('local',{count:a.count+1,until:Date.now()+5*60_000});return fail(401,'INVALID_CREDENTIALS');
      }
      failed.delete('local');const sid=randomBytes(32).toString('hex');const csrf=randomBytes(24).toString('hex');sessions.set(sid,{csrf,expires:Date.now()+60*60*1000});
      return send(200,{authenticated:true,csrf},{'set-cookie':`ds_session=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600`});
+     });
    }
    if(!s)return fail(401,'AUTH_REQUIRED');
    if(req.method==='POST'||req.method==='DELETE'){
      if(!req.headers['x-dramasaku-csrf']||denyKey(req.headers['x-dramasaku-csrf'],s.csrf))return fail(403,'CSRF_DENIED');
+   }
+   if(req.method==='POST'&&p==='/api/team/password'){
+     if(!password)return fail(409,'TEAM_LOGIN_DISABLED');
+     const body=await readJson(4096);
+     return await edit(async()=>{
+       if(!session(req))return fail(401,'AUTH_REQUIRED');
+       if(!await password.verify(body?.currentPassword))return fail(403,'WRONG_PASSWORD');
+       if(!validTeamPassword(body?.newPassword))return fail(422,'PASSWORD_POLICY');
+       await password.replace(body.newPassword);
+       sessions.clear();
+       return send(200,{changed:true});
+     });
    }
    if(req.method==='POST'&&p==='/api/logout'){
      const m=/(?:^|;\s*)ds_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie||'');if(m)sessions.delete(m[1]);return send(200,{ok:true},{'set-cookie':'ds_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'});
@@ -132,7 +160,7 @@ export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=proces
    if(req.method==='GET'&&p==='/api/studio/status')return send(200,{version:'0.8.0',mode:'local_internal',tools:await localTools(),paidVideoEnabled:activation?(await activation.status()).ready:aiideVideoEnabled&&aiideVideoCapabilityVerified,paidTtsEnabled:ttsEnabled&&(ttsCapabilityVerified||aiideTtsCapabilityVerified),paidImageEnabled:false,readOnlyAiide:aiideReadOnlyEnabled,modelCount:aiideVideoCatalog().models.length,sharing:'portable_package',maxPackageMediaBytes:64*1024*1024,multiUser:false});
    if(req.method==='GET'&&p==='/api/aiide-video/status')return send(200,await aiideVideo.list());
    if(req.method==='POST'&&p==='/api/aiide-video/import')return send(201,{job:await aiideVideo.importTask(await readJson(3000))});
-   if(req.method==='POST'&&p==='/api/aiide-video/submit')return send(201,{job:await aiideVideo.submit(await readJson(16000))});
+   if(req.method==='POST'&&p==='/api/aiide-video/submit'){const body=await readJson(16000);await inspectInput(body?.input);return send(201,{job:await aiideVideo.submit(body)});}
    if(req.method==='POST'&&/^\/api\/aiide-video\/jobs\/[a-f0-9]{24}\/check$/.test(p))return send(200,{job:await aiideVideo.check(p.split('/')[4])});
    if(req.method==='POST'&&/^\/api\/aiide-video\/jobs\/[a-f0-9]{24}\/attach$/.test(p)){
      const projectId=await currentProject();if(!projectId)return fail(409,'PROJECT_NOT_SAVED');
@@ -170,10 +198,19 @@ export function createLocalConsole({host='127.0.0.1',port=4184,adminToken=proces
       const input=await readJson();const created=await seedance.createJob(input);return send(201,created);
    }
    if(req.method==='GET'&&p==='/api/key-pools')return send(200,await keyPools.list());
-   if(req.method==='POST'&&p==='/api/key-pools'){const key=await keyPools.add(await readJson());const connection=activation&&key.group==='video'&&key.provider==='aiide'?await activation.check(key.id):null;return send(201,{key,connection});}
+   if(req.method==='POST'&&p==='/api/key-pools'){
+     const input=await readJson(),key=await keyPools.add(keyOnboardingInput(input));
+     let connection=null;
+     if(activation&&key.group==='video'&&key.provider==='aiide')connection=await activation.check(key.id);
+     else if(!input.group&&['aiide','openai','google'].includes(key.provider)){
+       try{connection=await keyConnection.test({keyId:key.id});}
+       catch(e){connection={state:'unavailable',errorCode:e.code||'KEY_CHECK_UNAVAILABLE',matchingVideoModels:[]};}
+     }
+     return send(201,{key,connection});
+   }
    if(req.method==='POST'&&p==='/api/key-pools/test'){
      const body=await readJson(1000);if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).join(',')!=='keyId')return fail(422,'KEY_CHECK_INPUT_INVALID');
-     const key=(await keyPools.list()).pools.find(p=>p.id==='video')?.keys.find(k=>k.id===body.keyId);return send(200,activation&&key?await activation.check(body.keyId,{fresh:true}):await keyConnection.test(body));
+     const key=(await keyPools.list()).pools.find(p=>p.id==='video')?.keys.find(k=>k.id===body.keyId);return send(200,activation&&key?.provider==='aiide'?await activation.check(body.keyId,{fresh:true}):await keyConnection.test(body));
    }
    if(req.method==='POST'&&p==='/api/key-pools/move-to-video'){
      const body=await readJson(1000);if(!body||Object.keys(body).join(',')!=='keyId')return fail(422,'KEY_CHECK_INPUT_INVALID');

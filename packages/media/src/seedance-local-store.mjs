@@ -46,6 +46,7 @@ export function createSeedanceLocalStore({root}={}){
    const {stdout}=await exec('ffprobe',['-v','error','-protocol_whitelist','file,pipe','-show_streams','-show_format','-of','json',join(folder,id+'.bin')],{timeout:12000,maxBuffer:1000000});
    const data=JSON.parse(stdout),stream=data.streams?.find(s=>s.codec_type===(asset.kind==='audio'?'audio':'video'));
    if(!stream)throw Error('No media stream');
+   if(asset.mime==='audio/mpeg'&&stream.codec_name!=='mp3')throw Error('Not an MP3 stream');
    const duration=Number(data.format?.duration||stream.duration||0),[num,den]=String(stream.avg_frame_rate||'0/1').split('/').map(Number);
    if(asset.kind!=='image'&&(!Number.isFinite(duration)||duration<=0||duration>600))throw Error('Duration invalid');
    Object.assign(asset,{inspected:true,width:stream.width||null,height:stream.height||null,durationSeconds:asset.kind==='image'?null:duration,fps:den?num/den:0,hasAudio:data.streams.some(s=>s.codec_type==='audio')});

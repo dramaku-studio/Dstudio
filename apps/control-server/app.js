@@ -8,7 +8,7 @@ async function api(path,{method='GET',body=null}={}){
   const r=await fetch(path,{method,headers,body:body===null?null:JSON.stringify(body),credentials:'same-origin',cache:'no-store'});
   const data=await r.json();if(!r.ok)throw Error(data.error||`HTTP_${r.status}`);return data;
 }
-async function refresh(){const session=await api('/api/session');csrf=session.csrf;
+async function refresh(){const session=await api('/api/session');csrf=session.csrf;document.body.classList.toggle('signed-out',!session.authenticated);
   $('authbadge').textContent=session.authenticated?'● Siap digunakan':'● Belum masuk';
   $('auth').hidden=session.authenticated;document.querySelectorAll('[data-run]').forEach(b=>b.disabled=!session.authenticated);
   $('savekey').querySelector('button').disabled=!session.authenticated;
@@ -43,11 +43,12 @@ function sdRevise(){const model=sdCurrent();if(!model)return;
  else sdChosen=sdChosen.map(ref=>({...ref,role:'reference_'+sdAssets.find(a=>a.id===ref.assetId).kind}));
  sdOptions('sd-ratio',model.ratioOptions,$('sd-ratio').value);
  sdText('sd-ratio-hint','Pilihan rasio mengikuti kontrak model AIIDE.');
- const options=[];
- if(model.minDuration===-1)options.push({id:'-1',label:'Ikuti video sumber (maks. 15 detik)'});
- else for(let n=model.minDuration;n<=model.maxDuration;n+=model.durationStep)options.push({id:String(n),label:`${n} detik`});
- sdOptions('sd-duration',options,$('sd-duration').value);
- sdText('sd-duration-hint',model.minDuration===-1?'Durasi mengikuti sumber.':`Durasi ${model.minDuration}–${model.maxDuration} detik.`);
+ const slider=$('sd-duration'),sourceDuration=model.minDuration===-1;
+ slider.min=sourceDuration?-1:Math.max(4,model.minDuration);slider.max=sourceDuration?-1:Math.min(30,model.maxDuration);slider.step=model.durationStep||1;
+ slider.value=sourceDuration?-1:Math.max(Number(slider.min),Math.min(Number(slider.max),Number(slider.value)||5));
+ slider.disabled=slider.min===slider.max;
+ sdText('sd-duration-value',sourceDuration?'Ikuti video sumber':slider.value+' detik');
+ sdText('sd-duration-hint',sourceDuration?'Durasi mengikuti sumber.':`Model ini: ${slider.min}–${slider.max} detik. Rentang studio 4–30 detik dibatasi profil provider terverifikasi.`);
  sdOptions('sd-resolution',model.resolutions.map(id=>({id,label:id==='provider_default'?'Mengikuti provider':id})),$('sd-resolution').value);
  $('sd-draft').disabled=true;$('sd-draft').checked=false;$('sd-seed').disabled=true;$('sd-seed').value='';
  $('sd-audio').disabled=!model.supportsAudio;if(!model.supportsAudio)$('sd-audio').checked=false;
@@ -56,29 +57,134 @@ function sdRevise(){const model=sdCurrent();if(!model)return;
  $('sd-reference-section').hidden=mode==='text_to_video';
  sdRenderAssets();$('sd-live').disabled=!sdCanGenerate(sdLiveConfiguration);
 }
+const sdReferenceEdits=new Map(),sdReferenceWrites=new Map();
 const sdRoles={image:[['first_frame','First frame'],['last_frame','Last frame'],['reference_image','Reference image']],video:[['reference_video','Reference video']],audio:[['reference_audio','Reference audio']]};
-function sdRenderAssets(){const target=$('sd-assets');target.replaceChildren();if(!sdAssets.length){const p=document.createElement('p');p.className='hint';p.textContent='Belum ada referensi. Tambahkan gambar, video, atau audio lokal.';target.append(p);return;}
- const model=sdCurrent(),mode=sdMode();
- for(const a of sdAssets){
-  const row=document.createElement('div');row.className='reference-row';const visual=document.createElement('div');visual.className='asset-preview';
-  if(a.kind==='image'){const img=document.createElement('img');img.src=`/api/seedance/assets/${a.id}/media`;img.alt=a.name;visual.append(img);}else visual.textContent=a.kind==='video'?'▶':'♫';
-  const title=document.createElement('div');title.className='asset-title';const strong=document.createElement('strong');strong.textContent=a.name;const small=document.createElement('small');small.textContent=`${a.kind} · ${Math.ceil(a.bytes/1024)} KB`;title.append(strong,small);
-  const selected=sdChosen.find(x=>x.assetId===a.id),sel=document.createElement('select');sel.setAttribute('aria-label',`Peran ${a.name}`);
-  let roles=sdRoles[a.kind].filter(([role])=>mode==='image_to_video'?role==='first_frame':mode==='first_last'?['first_frame','last_frame'].includes(role):role.startsWith('reference_'));
-  if(!model||!model[{image:'maxImages',video:'maxVideos',audio:'maxAudios'}[a.kind]])roles=[];
-  for(const [value,label] of roles){const op=document.createElement('option');op.value=value;op.textContent=label;sel.append(op);}if(selected)sel.value=selected.role;
-  sel.disabled=!roles.length;
-  sel.addEventListener('change',()=>{const ref=sdChosen.find(x=>x.assetId===a.id);if(ref)ref.role=sel.value;sdInvalidate();});
-  const btn=document.createElement('button');btn.type='button';btn.className='ghost';btn.textContent=selected?'Lepas':'Lampirkan';btn.disabled=!selected&&!roles.length;
-  btn.addEventListener('click',()=>{if(selected)sdChosen=sdChosen.filter(x=>x.assetId!==a.id);else sdChosen.push({assetId:a.id,role:sel.value});sdRevise();sdInvalidate();});
-  row.append(visual,title,sel,btn);
-  if(selected){const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Alamat referensi AIIDE (opsional untuk tes lokal)';
-   const info=document.createElement('p');info.textContent='File ini tetap lokal. Untuk jalur live kelak, isi URL HTTPS publik atau asset://mat_... yang tersedia pada akun AIIDE. Menyimpan alamat tidak mengunggah file.';
-   const field=document.createElement('input');field.value=a.providerReference||'';field.maxLength=2048;field.placeholder='https://... atau asset://mat_...';field.setAttribute('aria-label',`Referensi provider ${a.name}`);
-   const save=document.createElement('button');save.type='button';save.textContent='Simpan Alamat';save.onclick=async()=>{try{await api(`/api/seedance/assets/${a.id}/reference`,{method:'POST',body:{reference:field.value.trim()}});await sdRefresh();sdText('sd-upload-status','Alamat disimpan lokal. Tidak ada unggahan atau generate.');}catch(e){sdText('sd-upload-status',studioError(e));}};
-   details.append(summary,info,field,save);row.append(details);
+function sdTags(){const counts={image:0,audio:0,video:0};return new Map(sdChosen.map(r=>{const a=sdAssets.find(x=>x.id===r.assetId);return [r.assetId,a?'@'+a.kind+(++counts[a.kind]):''];}));}
+function sdRemapPromptTags(before){
+ const after=sdTags();
+ const mapping=new Map([...before].map(([id,tag])=>[tag,after.get(id)||'']));
+ $('sd-prompt').value=$('sd-prompt').value.replace(/@(image|audio|video)\d+\b/g,tag=>mapping.has(tag)?mapping.get(tag):tag);
+}
+function sdRemoveAttachment(id){
+ const before=sdTags();
+ sdChosen=sdChosen.filter(ref=>ref.assetId!==id);
+ sdRemapPromptTags(before);
+ sdRenderAssets();sdInvalidate();
+}
+function sdAttachmentCheck(items){
+ const model=sdCurrent(),counts={image:0,video:0,audio:0},seconds={audio:0,video:0};
+ for(const a of items){counts[a.kind]++;
+  if(a.kind!=='image'){
+   if(a.bytes>5*1024*1024)throw Error('Audio/video maksimal 5 MB per file.');
+   if(a.kind==='audio'&&a.mime!=='audio/mpeg')throw Error('Audio referensi harus MP3.');
+   if(!a.inspected||!Number.isFinite(a.durationSeconds)||a.durationSeconds<=0)throw Error('Durasi belum terbaca. Periksa FFprobe.');
+   seconds[a.kind]+=a.durationSeconds;
   }
-  target.append(row);
+ }
+ if(counts.image>Math.min(10,model.maxImages)||counts.video>model.maxVideos||counts.audio>model.maxAudios)throw Error('Jumlah lampiran melebihi batas model terpilih.');
+ if(items.filter(a=>a.kind==='audio').reduce((sum,a)=>sum+a.bytes,0)>5*1024*1024)throw Error('Total ukuran audio maksimal 5 MB.');
+ if(seconds.audio>30.001||seconds.video>30.001)throw Error('Total audio atau video maksimal 30 detik.');
+ if(['seedance','sora'].includes(model.family)&&seconds.video>15.01)throw Error('Profil model ini membatasi total video referensi hingga 15 detik.');
+ if(sdMode()==='image_to_video'&&items.length>1)throw Error('Mode gambar awal hanya menerima satu gambar.');
+ if(sdMode()==='first_last'&&items.length>2)throw Error('Mode awal/akhir hanya menerima dua gambar.');
+}
+function sdAcceptsAsset(asset){
+ const model=sdCurrent(),mode=sdMode();
+ if(!model||!asset||mode==='text_to_video')return false;
+ if(['first_last','image_to_video'].includes(mode)&&asset.kind!=='image')return false;
+ if(asset.kind==='audio'&&asset.mime!=='audio/mpeg')return false;
+ return model[{image:'maxImages',audio:'maxAudios',video:'maxVideos'}[asset.kind]]>0;
+}
+function sdAttachAsset(asset){
+ if(!sdAcceptsAsset(asset))throw Error('Pilih mode yang mendukung jenis media ini.');
+ if(sdChosen.some(ref=>ref.assetId===asset.id))throw Error('Media sudah dilampirkan.');
+ sdAttachmentCheck([...sdChosen.map(ref=>sdAssets.find(a=>a.id===ref.assetId)),asset]);
+ let role='reference_'+asset.kind;
+ if(sdMode()==='image_to_video')role='first_frame';
+ if(sdMode()==='first_last')role=sdChosen.some(ref=>ref.role==='first_frame')?'last_frame':'first_frame';
+ sdChosen.push({assetId:asset.id,role});
+ sdRenderAssets();
+ sdInvalidate();
+}
+function sdRenderLibrary(){
+ const term=$('sd-library-search').value.trim().toLowerCase();
+ const available=sdAssets.filter(asset=>sdAcceptsAsset(asset)&&asset.name.toLowerCase().includes(term)&&!sdChosen.some(ref=>ref.assetId===asset.id));
+ const choices=available.map(asset=>({id:asset.id,label:asset.name+' · '+asset.kind}));
+ if(!choices.length)choices.push({id:'',label:term?'Tidak ada media yang cocok':'Belum ada media yang dapat dipilih'});
+ sdOptions('sd-library-asset',choices);
+ $('sd-library-add').disabled=!available.length||sdUploading;
+}
+$('sd-library-search').addEventListener('input',sdRenderLibrary);
+$('sd-library-add').addEventListener('click',async()=>{
+ const id=$('sd-library-asset').value,asset=sdAssets.find(item=>item.id===id);
+ if(!asset||sdUploading)return;
+ $('sd-library-add').disabled=true;
+ try{
+  if(!asset.inspected)Object.assign(asset,(await api('/api/seedance/assets/'+id+'/inspect',{method:'POST',body:{}})).asset);
+  if(sdAssets.some(item=>item.id===id))sdAttachAsset(asset);
+ }catch(e){sdText('sd-upload-status',studioError(e));}
+ finally{sdRenderLibrary();}
+});
+function sdRenderAssets(){
+ sdRenderLibrary();
+ const target=$('sd-assets'),videoTarget=$('sd-video-assets');target.replaceChildren();videoTarget.replaceChildren();
+ const model=sdCurrent(),mode=sdMode(),tags=sdTags(),chosen=sdChosen.map(r=>sdAssets.find(a=>a.id===r.assetId)).filter(Boolean);
+ const total=kind=>chosen.filter(a=>a.kind===kind).reduce((sum,a)=>sum+(a.durationSeconds||0),0).toFixed(1);
+ sdText('sd-attachment-summary',`${chosen.filter(a=>a.kind==='image').length}/${Math.min(10,model?.maxImages||0)} gambar · Audio ${total('audio')}/30 detik · MP3 total maks. 5 MB · Batas audio model: ${model?.maxAudios||0} file`);
+ const frames=['image_to_video','first_last'].includes(mode);
+ if(frames)sdText('sd-attachment-summary',chosen.length+' / '+(mode==='first_last'?2:1)+' gambar');
+ $('sd-upload').accept=frames||!model?.maxAudios?'image/png,image/jpeg,image/webp':'image/png,image/jpeg,image/webp,audio/mpeg,.mp3';
+ document.querySelector('label[for="sd-upload"]').textContent=frames||!model?.maxAudios?'Gambar referensi':'Gambar & audio MP3';
+ const videoAllowed=!frames&&!!model?.maxVideos;
+ for(const el of [document.querySelector('label[for="sd-video-upload"]'),$('sd-video-upload'),$('sd-video-summary')])el.hidden=!videoAllowed;
+ sdText('sd-video-summary',`Video ${total('video')}/${['seedance','sora'].includes(model?.family)?15:30} detik · Maks. 5 MB/file · Batas model: ${model?.maxVideos||0} file`);
+ for(const a of chosen){
+  const row=document.createElement('article');row.className='reference-row attachment-card';
+  const visual=document.createElement('div');visual.className='asset-preview';
+  if(a.kind==='image'){const img=document.createElement('img');img.src=`/api/seedance/assets/${a.id}/media`;img.alt=a.name;visual.append(img);}else visual.textContent=a.kind==='video'?'▶':'♫';
+  const title=document.createElement('div');title.className='asset-title';const strong=document.createElement('strong');strong.textContent=a.name;const small=document.createElement('small');small.textContent=`${Math.ceil(a.bytes/1024)} KB`+(a.durationSeconds?` · ${a.durationSeconds.toFixed(1)} detik`:'');title.append(strong,small);
+  const tag=document.createElement('button');tag.type='button';tag.className='ghost';tag.textContent=tags.get(a.id);tag.onclick=()=>{const prompt=$('sd-prompt');prompt.setRangeText(tag.textContent+' ',prompt.selectionStart,prompt.selectionEnd,'end');prompt.focus();sdInvalidate();};
+  const remove=document.createElement('button');remove.type='button';remove.className='ghost';remove.textContent='×';remove.setAttribute('aria-label','Hapus '+tags.get(a.id));remove.onclick=()=>sdRemoveAttachment(a.id);
+  row.append(visual,title,tag,remove);
+  if(mode==='first_last'){const sel=document.createElement('select');for(const [value,label] of sdRoles.image.slice(0,2)){const op=document.createElement('option');op.value=value;op.textContent=label;sel.append(op);}sel.value=sdChosen.find(r=>r.assetId===a.id).role;sel.onchange=()=>{for(const ref of sdChosen)ref.role=ref.assetId===a.id?sel.value:sel.value==='first_frame'?'last_frame':'first_frame';sdRenderAssets();sdInvalidate();};row.append(sel);}
+  const link=document.createElement('div');link.className='attachment-link';const label=document.createElement('label');label.textContent='URL publik aset ini';const field=document.createElement('input');field.type='url';field.value=a.providerReference||'';field.maxLength=2048;field.placeholder='https://...';field.setAttribute('aria-label','URL '+tags.get(a.id));
+  const message=document.createElement('small');message.textContent=a.providerReference?'URL tersimpan':'Diperlukan untuk generate live; tes lokal tetap tersedia.';
+  const edit=sdReferenceEdits.get(a.id);
+  if(edit){field.value=edit.value;message.textContent=edit.message;}
+  field.oninput=()=>{
+   if(!sdReferenceWrites.has(a.id)&&field.value.trim()===(a.providerReference||'')){
+    sdReferenceEdits.delete(a.id);
+    message.textContent=a.providerReference?'URL tersimpan':'Diperlukan untuk generate live.';
+    return;
+   }
+   sdReferenceEdits.set(a.id,{value:field.value,message:'Simpan perubahan URL dengan meninggalkan kolom.'});
+  };
+  field.onchange=async()=>{
+   const value=field.value.trim();
+   const previous=sdReferenceWrites.get(a.id)||Promise.resolve();
+   const entry={value,message:'Menyimpan URL…'};
+   sdReferenceEdits.set(a.id,entry);
+   message.textContent=entry.message;
+   const write=previous.then(async()=>{
+    try{
+     const result=await api('/api/seedance/assets/'+a.id+'/reference',{method:'POST',body:{reference:value}});
+     const cached=sdAssets.find(asset=>asset.id===a.id);
+     if(cached)Object.assign(cached,result.asset);
+     if(sdReferenceEdits.get(a.id)===entry){
+      sdReferenceEdits.delete(a.id);
+      message.textContent=value?'URL tersimpan':'URL dilepas';
+      sdInvalidate();
+     }
+    }catch(e){
+     entry.message=studioError(e);
+     if(sdReferenceEdits.get(a.id)===entry)message.textContent=entry.message;
+    }
+   });
+   sdReferenceWrites.set(a.id,write);
+   await write;
+   if(sdReferenceWrites.get(a.id)===write)sdReferenceWrites.delete(a.id);
+  };
+  label.append(field);link.append(label,message);row.append(link);(a.kind==='video'?videoTarget:target).append(row);
  }
 }
 function sdCanGenerate(live){return !!(live?.enabled&&(live.capabilityVerified||live.credentialVerified)&&live.configured&&live.usedToday<live.maxDaily&&(!live.autoActivation||live.availableModels.includes($('sd-model').value)));}
@@ -130,12 +236,18 @@ async function sdLoad(){
  $('sd-model').disabled=false;$('sd-mode').disabled=false;
  // Mode availability comes from AIIDE's per-model contract registry.
  ['sd-upload-btn','sd-preview','sd-generate','sd-refresh'].forEach(id=>$(id).disabled=false);
- sdRevise();await sdRefresh();await sdRenderLiveJobs();
+ sdRevise();await sdRefresh();await sdRenderLiveJobs({selectAvailableModel:true});
  if(sdLiveConfiguration?.autoActivation&&sdLiveConfiguration.availableModels.length&&!sdLiveConfiguration.availableModels.includes($('sd-model').value)){$('sd-model').value=sdLiveConfiguration.availableModels[0];sdRevise();sdText('sd-live-status',videoLiveHelp(sdLiveConfiguration));}
 }
 async function sdRefresh(){
  const [a,j]=await Promise.all([api('/api/seedance/assets'),api('/api/aiide-video/drafts')]);
- sdAssets=a.assets;sdRenderAssets();const list=$('sd-jobs');list.replaceChildren();
+ historyDrafts=j.jobs;internalPaintHistory();
+ const before=sdTags();
+ sdAssets=a.assets;
+ sdChosen=sdChosen.filter(ref=>sdAssets.some(asset=>asset.id===ref.assetId));
+ sdRemapPromptTags(before);
+ updatePromptCount('sd-prompt');
+ sdRenderAssets();const list=$('sd-jobs');list.replaceChildren();
  for(const item of j.jobs){const line=document.createElement('div');line.className='activity-item';const text=document.createElement('span');text.textContent=`${sdCatalog?.models.find(m=>m.id===item.model)?.label||item.model} · ${item.mode}`;
  const button=document.createElement('button');button.type='button';button.className='ghost';button.textContent='Buka Draf';button.onclick=()=>sdOpenDraft(item.id);line.append(text,button);list.append(line);}
  if(!j.jobs.length)list.textContent='Belum ada draf video.';
@@ -145,15 +257,22 @@ async function sdRefresh(){
 async function sdOpenDraft(id){try{
  if($('sd-prompt').value.trim()&&!confirm('Muat draf video? Isian video yang belum disimpan akan diganti.'))return;
  const {job}=await api('/api/aiide-video/drafts/'+id),input=job.request;
- $('sd-model').value=input.model;$('sd-mode').value=input.mode;sdChosen=input.assets.map(x=>({...x}));sdRevise();$('sd-mode').value=input.mode;sdRevise();
+ $('sd-model').value=input.model;sdChosen=[];sdRevise();$('sd-mode').value=input.mode;sdChosen=input.assets.map(x=>({...x}));sdRevise();
  for(const [field,value] of Object.entries({'sd-prompt':input.prompt,'sd-prompt-language':input.promptLanguage,'sd-ratio':input.ratio,'sd-resolution':input.resolution,'sd-duration':input.duration}))$(field).value=String(value);
  $('sd-audio').checked=input.generateAudio;$('sd-watermark').checked=input.watermark;sdRevise();openView('video-studio');sdText('sd-plan-status','Draf dipulihkan lengkap. Periksa referensi sebelum melanjutkan.');
  }catch(e){sdText('sd-plan-status',studioError(e));}}
 function sdInput(){const seed=$('sd-seed').value.trim();return {model:$('sd-model').value,mode:sdMode(),prompt:$('sd-prompt').value,promptLanguage:$('sd-prompt-language').value,ratio:$('sd-ratio').value,resolution:$('sd-resolution').value,duration:Number($('sd-duration').value),generateAudio:$('sd-audio').checked,watermark:$('sd-watermark').checked,draft:$('sd-draft').checked,...(seed===''?{}:{seed:Number(seed)}),assets:sdChosen.map(x=>({...x}))};}
 $('sd-provider').addEventListener('change',async()=>{sdStopPolling();sdPollCount=0;await sdRenderLiveJobs().catch(e=>sdText('sd-live-status',e.message));});
-function sdInvalidate(){sdText('sd-plan-status','Pengaturan berubah. Jalankan Uji Mode Lokal atau simpan draf terbaru.');$('sd-request').textContent='';sdText('sd-upload-status',`${sdChosen.length} referensi dipilih.`);}
-$('sd-model').addEventListener('change',()=>{sdRevise();sdInvalidate();});
-$('sd-mode').addEventListener('change',()=>{sdRevise();sdInvalidate();});
+function sdInvalidate(){updatePromptCount('sd-prompt');sdText('sd-plan-status','Pengaturan berubah. Jalankan Uji Mode Lokal atau simpan draf terbaru.');$('sd-request').textContent='';sdText('sd-upload-status',`${sdChosen.length} referensi dipilih.`);}
+for(const control of ['sd-model','sd-mode']){
+ $(control).addEventListener('change',()=>{
+  const before=sdTags();
+  sdRevise();
+  sdRemapPromptTags(before);
+  sdInvalidate();
+  sdText('sd-live-status',videoLiveHelp(sdLiveConfiguration));
+ });
+}
 for(const id of ['sd-prompt','sd-prompt-language','sd-duration','sd-resolution','sd-ratio','sd-audio','sd-watermark'])$(id).addEventListener('input',sdInvalidate);
 $('sd-draft').addEventListener('change',sdRevise);
 $('sd-refresh').addEventListener('click',()=>sdRefresh().catch(e=>sdText('sd-live-status',e.message)));
@@ -164,23 +283,45 @@ $('sd-live-refresh').addEventListener('click',async()=>{
    await sdRenderLiveJobs();
  }catch(e){sdText('sd-live-status',`Hasil belum tersedia: ${sdLiveError(e.message)}`);}
 });
-$('sd-upload-btn').addEventListener('click',async()=>{
- const files=[...$('sd-upload').files];if(!files.length)return;
- $('sd-upload-btn').disabled=true;
- try{for(const file of files){const response=await fetch('/api/seedance/assets',{method:'POST',headers:{'content-type':'application/octet-stream','origin':location.origin,'x-dramasaku-csrf':csrf,'x-asset-name':encodeURIComponent(file.name)},credentials:'same-origin',body:file});const data=await response.json();if(!response.ok)throw Error(data.error||'Upload gagal');}await sdRefresh();sdText('sd-upload-status','Referensi ditambahkan.');}
- catch(e){sdText('sd-upload-status',e.message);}finally{$('sd-upload-btn').disabled=false;}
-});
+let sdUploading=false;
+async function sdUploadAttachments(input){
+ if(sdUploading)return;const files=[...input.files];if(!files.length)return;sdUploading=true;
+ $('sd-upload').disabled=true;$('sd-video-upload').disabled=true;$('sd-live').disabled=true;
+ try{for(const file of files){
+  const kind=/\.mp3$/i.test(file.name)?'audio':/\.mp4$/i.test(file.name)?'video':/\.(png|jpe?g|webp)$/i.test(file.name)?'image':null;
+  if(!kind||(input.id==='sd-video-upload'?kind!=='video':kind==='video'))throw Error('Pilih gambar/MP3 atau MP4 pada kolom yang sesuai.');
+  if(!sdAcceptsAsset({kind,mime:kind==='audio'?'audio/mpeg':file.type}))throw Error('Pilih mode yang mendukung jenis media ini.');
+  if(kind!=='image'&&file.size>5*1024*1024)throw Error('Audio/video maksimal 5 MB per file.');
+  const response=await fetch('/api/seedance/assets',{method:'POST',headers:{'content-type':'application/octet-stream','x-dramasaku-csrf':csrf,'x-asset-name':encodeURIComponent(file.name)},credentials:'same-origin',body:file});const data=await response.json();if(!response.ok)throw Error(data.error||'Upload gagal');
+  const {asset}=await api(`/api/seedance/assets/${data.asset.id}/inspect`,{method:'POST',body:{}});
+  sdAssets.unshift(asset);
+  sdAttachAsset(asset);
+ }sdText('sd-upload-status','Lampiran siap. Tag otomatis tersedia; isi URL publik aset untuk live.');
+ }catch(e){sdText('sd-upload-status',studioError(e));}
+ finally{input.value='';sdUploading=false;sdRenderLibrary();$('sd-upload').disabled=false;$('sd-video-upload').disabled=false;$('sd-live').disabled=!sdCanGenerate(sdLiveConfiguration);}
+}
+$('sd-upload').addEventListener('change',()=>sdUploadAttachments($('sd-upload')));
+$('sd-video-upload').addEventListener('change',()=>sdUploadAttachments($('sd-video-upload')));
+$('sd-upload-btn').addEventListener('click',()=>sdUploadAttachments($('sd-upload')));
+$('sd-duration').addEventListener('input',()=>sdText('sd-duration-value',$('sd-duration').value+' detik'));
 $('sd-preview').addEventListener('click',async()=>{try{await api('/api/aiide-video/preview',{method:'POST',body:sdInput()});sdText('sd-plan-status','Pengaturan sesuai untuk draf lokal. Tidak ada request provider.');}catch(e){sdText('sd-plan-status',e.message);}});
 $('sd-generate').addEventListener('click',async()=>{try{await api('/api/aiide-video/drafts',{method:'POST',body:sdInput()});await sdRefresh();sdText('sd-plan-status','Draf video tersimpan lengkap.');if(typeof internalReload==='function')await internalReload();}catch(e){sdText('sd-plan-status',studioError(e));}});
 $('sd-live').addEventListener('click',async()=>{
  const button=$('sd-live');button.disabled=true;let submitError=null;
  try{
+  if(sdUploading){submitError='Tunggu lampiran selesai diperiksa.';return;}
+  await Promise.all(sdChosen.map(ref=>sdReferenceWrites.get(ref.assetId)));
+  if(sdChosen.some(ref=>sdReferenceEdits.has(ref.assetId))){
+   submitError='Periksa dan simpan URL publik yang diubah sebelum generate.';return;
+  }
+  sdAttachmentCheck(sdChosen.map(r=>sdAssets.find(a=>a.id===r.assetId)));
   const live=await sdLiveStatus();sdLiveConfiguration=live;
   if(!sdCanGenerate(live)){sdText('sd-live-status',videoLiveHelp(live));return;}
-  const plan=await api('/api/aiide-video/preview',{method:'POST',body:sdInput()});
-  if(plan.missingReferences.length){sdText('sd-live-status','Referensi masih lokal. Siapkan alamat yang dapat dibaca provider sebelum jalur live.');return;}
+  const input=sdInput();
+  const plan=await api('/api/aiide-video/preview',{method:'POST',body:input});
+  if(plan.missingReferences.length){submitError='Pasangkan setiap lampiran dengan URL publik aset yang sama sebelum generate.';return;}
   if(!confirm('Kirim SATU permintaan video berbayar melalui AIIDE? Biaya mengikuti penyedia. Jika status tidak pasti, jangan mengirim ulang.'))return;
-  const res=await api(sdLiveBase()+'/submit',{method:'POST',body:{input:sdInput(),expectedRequestHash:plan.requestHash,consent:'I_ACCEPT_PROVIDER_CHARGES'}});
+  const res=await api(sdLiveBase()+'/submit',{method:'POST',body:{input,expectedRequestHash:plan.requestHash,consent:'I_ACCEPT_PROVIDER_CHARGES'}});
   sdPollCount=0;sdPollFailures=0;
   sdText('sd-live-status',res.job.status==='submission_unknown'?'Pengiriman belum pasti. Cek Task Logs AIIDE sebelum mengulang.':'Video sedang dibuat. Hasil akan muncul otomatis di kanan.');
   await sdRenderLiveJobs();
@@ -208,8 +349,12 @@ function sdShowPlayer(job){
    sdText('sd-viewer-note','Video siap diputar dan diunduh.');sdText('sd-viewer-tag','Selesai');
  }else{player.pause();player.hidden=true;player.removeAttribute('src');player.load();download.hidden=true;$('sd-viewer-icon').hidden=false;}
 }
-async function sdRenderLiveJobs(){
+async function sdRenderLiveJobs({selectAvailableModel=false}={}){
  const data=await sdLiveStatus();sdLiveConfiguration=data;
+ if(selectAvailableModel&&data.autoActivation&&data.availableModels?.length&&!data.availableModels.includes($('sd-model').value)){
+  const model=data.availableModels.find(id=>Array.from($('sd-model').options).some(o=>o.value===id));
+  if(model){$('sd-model').value=model;sdRevise();}
+ }
  $('sd-live').disabled=!sdCanGenerate(data);
  const recovery=$('sd-aiide-recovery');recovery.hidden=!sdIsAiide();
  const account=$('sd-import-account'),selected=account.value;account.replaceChildren();
@@ -219,6 +364,7 @@ async function sdRenderLiveJobs(){
  $('sd-import-button').disabled=!data.readOnlyEnabled||!options.length;
  sdText('sd-import-status',!options.length?'Tidak ada akun AIIDE aktif. Cek Pengaturan Kunci API.':!data.readOnlyEnabled?'Pengambilan video lama belum diaktifkan oleh pengelola Studio.':'Masukkan Task ID dari AIIDE jika videonya sudah pernah dibuat.');
  sdText('sd-live-status',videoLiveHelp(data));
+ if(typeof internalPaintHistory==='function')internalPaintHistory();
  const list=$('sd-live-jobs');list.replaceChildren();
  const jobs=data.jobs||[];
  const ready=jobs.find(j=>j.status==='ready');sdShowPlayer(ready);
@@ -252,6 +398,7 @@ const pageMeta={
  'history':['Riwayat Karya','Lihat aktivitas dan draf terbaru.'],
  'credentials':['Pengaturan Kunci API','Kelola layanan AI untuk tim.'],
  'audit':['Status Studio','Lihat fitur yang siap digunakan.'],
+ 'team-password':['Ganti Password','Kelola password tim pada perangkat ini.'],
  'help':['Panduan & Ketentuan','Pelajari cara menggunakan Dramasaku.']
 };
 function navigate(view){
@@ -263,6 +410,8 @@ function navigate(view){
  }
  $('page-title').textContent=pageMeta[view][0];$('page-subtitle').textContent=pageMeta[view][1];
  document.title=`${pageMeta[view][0]} | Dramasaku Studio`;
+ if(view==='video-studio')updatePromptCount('sd-prompt');
+ if(view==='image-studio')updatePromptCount('image-prompt');
  window.scrollTo?.({top:0,behavior:'auto'});
 }
 function openView(view){location.hash=view;if(location.hash==='#'+view)navigate(view);}
@@ -279,6 +428,19 @@ function workspaceInput(){
  return {projectName:$('project-name').value,screenplay:$('project-story').value,visualStyle:$('project-style').value,characters,shotsPerScene:Number($('project-shots').value),durationSec:Number($('project-duration').value)};
 }
 function workspaceSummary(metric,label){const div=document.createElement('div');div.className='metric-mini';const strong=document.createElement('strong');strong.textContent=String(metric);const small=document.createElement('small');small.textContent=label;div.append(strong,small);return div;}
+function updatePromptCount(id){
+ $(id+'-count').textContent=$(id).value.length+' / '+$(id).maxLength;
+}
+for(const button of document.querySelectorAll('[data-expand-prompt]')){
+ const id=button.dataset.expandPrompt;
+ $(id).addEventListener('input',()=>updatePromptCount(id));
+ button.addEventListener('click',()=>{
+  const expanded=$(id).classList.toggle('prompt-expanded');
+  button.setAttribute('aria-expanded',String(expanded));
+  button.textContent=expanded?'Ringkas tampilan':'Perluas prompt';
+  $(id).focus();
+ });
+}
 function transferVideoPrompt(prompt,statusId){
  const max=sdCatalog?.promptMaxChars??4000;
  if(!prompt.trim()||prompt.length>max){sdText(statusId,`Prompt video perlu 1–${max} karakter. Ringkas prompt sebelum melanjutkan.`);return false;}
@@ -287,13 +449,13 @@ function transferVideoPrompt(prompt,statusId){
 function createStoryboardPromptEditor(prompt,shotId){
  const max=sdCatalog?.promptMaxChars??4000;
  const container=document.createElement('div');
- const label=document.createElement('label');label.textContent=`Prompt video · ${shotId}`;
+ const label=document.createElement('label');label.textContent=`Prompt shot · ${shotId}`;
  const editor=document.createElement('textarea');editor.className='full-textarea';editor.rows=6;editor.value=prompt;editor.setAttribute('aria-label',`Prompt video ${shotId}`);
  const counter=document.createElement('p');counter.className='hint';counter.setAttribute('role','status');
  const button=document.createElement('button');button.type='button';button.className='ghost';button.textContent='Gunakan untuk Video →';
  const update=()=>{
   const valid=editor.value.trim().length>0&&editor.value.length<=max;
-  button.disabled=!valid;
+  button.disabled=!valid;imageButton.disabled=!valid;
   counter.textContent=`${editor.value.length}/${max} karakter. `+(editor.value.length>max?'Ringkas prompt shot ini sebelum melanjutkan. Pertahankan dialog dan identitas karakter.':'Periksa prompt sebelum melanjutkan.');
   editor.setAttribute('aria-invalid',String(!valid));
  };
@@ -302,8 +464,16 @@ function createStoryboardPromptEditor(prompt,shotId){
   update();if(button.disabled)return;
   transferVideoPrompt(editor.value,'project-status');
  });
- const note=document.createElement('small');note.textContent='Suntingan ini hanya untuk prompt video. Naskah proyek tidak diubah; salinan prompt tersimpan lewat Simpan Draf di Buat Video.';
- label.append(editor);container.append(label,counter,button,note);update();
+ const imageButton=document.createElement('button');imageButton.type='button';imageButton.className='ghost';imageButton.textContent='Gunakan untuk Gambar';
+ imageButton.addEventListener('click',()=>{
+  if(imageButton.disabled)return;
+  const field=$('image-prompt');
+  if(field.value.trim()&&field.value!==editor.value&&!confirm('Ganti deskripsi gambar yang sedang terbuka dengan prompt shot ini?'))return;
+  field.value=editor.value;$('image-shot').value=shotId;openView('image-studio');
+  sdText('image-status','Deskripsi dari '+shotId+' siap disunting.');
+ });
+ const note=document.createElement('small');note.textContent='Simpan draf di studio tujuan untuk memakai prompt ini kembali.';
+ label.append(editor);container.append(label,counter,button,imageButton,note);update();
  return container;
 }
 function renderWorkspace(w){
@@ -312,6 +482,13 @@ function renderWorkspace(w){
  const sm=$('storyboard-summary'),shots=$('storyboard-shots');sm.replaceChildren();shots.replaceChildren();
  if(!w){const p=document.createElement('p');p.className='hint';p.textContent='Belum ada storyboard. Siapkan cerita dahulu.';sm.append(p);return;}
  sm.append(workspaceSummary(w.story.scenes.length,'Adegan'),workspaceSummary(w.plan.shots.length,'Shot'),workspaceSummary(w.dna.characters.length,'Karakter'));
+ const canon=$('storyboard-canon');canon.replaceChildren();
+ const title=document.createElement('summary');title.textContent='Karakter dan gaya visual';canon.append(title);
+ const style=document.createElement('p');style.textContent=w.input.visualStyle;canon.append(style);
+ for(const character of w.input.characters){
+  const line=document.createElement('p');line.textContent=[character.name,character.appearance,character.wardrobe].join(' · ');canon.append(line);
+ }
+ canon.hidden=false;
  const result=w.plan.shots;
  for(const shot of result){
   const card=document.createElement('article');card.className='shot-card';const meta=document.createElement('div');meta.className='meta';meta.textContent=`${shot.sceneId} · Shot ${shot.sequence} · ${shot.durationSec}s · ${shot.framing}`;
@@ -374,10 +551,10 @@ $('project-import-file').addEventListener('change',async()=>{
 });
 // Enable project actions once a real local operator session exists (not before authentication).
 const originalRefresh=refresh;
-refresh=async function(){await originalRefresh();const s=await api('/api/session');if(s.authenticated){$('project-preview').disabled=false;$('project-save').disabled=false;$('project-export').disabled=false;$('project-import').disabled=false;$('image-generate').disabled=false;$('motion-generate').disabled=false;$('film-generate').disabled=false;$('storyboard-generate').disabled=false;await loadWorkspace();}};
+refresh=async function(){await originalRefresh();const s=await api('/api/session');if(s.authenticated){$('project-preview').disabled=false;$('project-save').disabled=false;$('project-export').disabled=false;$('project-import').disabled=false;$('image-generate').disabled=false;$('motion-generate').disabled=false;$('storyboard-generate').disabled=false;await loadWorkspace();}};
 $('image-from-plan').addEventListener('click',()=>{
  const p=activeWorkspace?.prompts?.find(p=>p.shotId===$('image-shot').value)||activeWorkspace?.prompts?.[0];if(!p){$('image-status').textContent='Prepare a project in Projects & Story first.';return;}
- $('image-prompt').value=p.prompt;$('image-status').textContent=`Loaded ${p.shotId}. This is a reference prompt, not a generated image.`;
+ $('image-prompt').value=p.prompt;$('image-shot').value=p.shotId;updatePromptCount('image-prompt');$('image-status').textContent='Deskripsi dari '+p.shotId+' siap disunting.';
 });
 $('image-to-video').addEventListener('click',()=>{transferVideoPrompt($('image-prompt').value,'image-status');});
 // CP-012: Two independent encrypted key groups, with provider-aware dry-run routing.
@@ -399,13 +576,13 @@ async function keyPoolsLoad(){
   toggle.addEventListener('click',async()=>{try{await api('/api/key-pools/update',{method:'POST',body:{id:key.id,enabled:!key.enabled}});await keyPoolsLoad();await sdRenderLiveJobs();}catch(e){$('pool-message').textContent=e.message;}});
   const remove=document.createElement('button');remove.className='ghost danger';remove.type='button';remove.textContent='Hapus';
   remove.addEventListener('click',async()=>{if(!confirm(`Hapus kunci "${key.label}"?`))return;try{await api(`/api/key-pools/${key.id}`,{method:'DELETE'});await keyPoolsLoad();await sdRenderLiveJobs();}catch(e){$('pool-message').textContent=e.message;}});
-  if(key.provider==='aiide'){
-   if(key.group==='creative'){const move=document.createElement('button');move.type='button';move.className='ghost';move.textContent='Pindahkan ke Video';move.onclick=async()=>{move.disabled=true;try{await api('/api/key-pools/move-to-video',{method:'POST',body:{keyId:key.id}});await keyPoolsLoad();await sdRenderLiveJobs();$('pool-message').textContent=videoLiveHelp(sdLiveConfiguration);}catch(e){$('pool-message').textContent=e.message;move.disabled=false;}};actions.append(move);}
+  if(['aiide','google','openai'].includes(key.provider)){
+   if(key.provider==='aiide'&&key.group==='creative'){const move=document.createElement('button');move.type='button';move.className='ghost';move.textContent='Pindahkan ke Video';move.onclick=async()=>{move.disabled=true;try{await api('/api/key-pools/move-to-video',{method:'POST',body:{keyId:key.id}});await keyPoolsLoad();await sdRenderLiveJobs();$('pool-message').textContent=videoLiveHelp(sdLiveConfiguration);}catch(e){$('pool-message').textContent=e.message;move.disabled=false;}};actions.append(move);}
    const check=document.createElement('button');check.className='ghost';check.type='button';check.textContent='Periksa Koneksi';check.disabled=!key.enabled;
    check.addEventListener('click',async()=>{
-    check.disabled=true;$('pool-message').textContent='Memeriksa koneksi AIIDE tanpa generate...';
+    check.disabled=true;$('pool-message').textContent='Memeriksa katalog provider...';
     try{const result=await api('/api/key-pools/test',{method:'POST',body:{keyId:key.id}});
-     $('pool-message').textContent=result.state==='connected'?`Koneksi AIIDE terbaca. ${result.modelCount} model tersedia; ${result.matchingVideoModels.length} cocok dengan katalog video engine. Model akun: ${(result.modelIds||[]).join(', ')}. ${key.group==='creative'?'Key ini berada di Teks & Gambar; gunakan Pindahkan ke Video untuk routing video.':''} ${result.matchingVideoModels.length?'Profil video cocok; kesiapan mengikuti kelompok dan kuota.':'Profil video belum cocok; generate tetap terkunci.'} Saldo dan keberhasilan generate belum diverifikasi.`:result.state==='rejected'?'Key ditolak atau tidak memiliki izin membaca katalog. Generate tetap nonaktif.':'Penyedia membatasi request. Tunggu sebelum memeriksa lagi; tidak ada generate baru.';
+     $('pool-message').textContent=result.state==='connected'&&key.provider!=='aiide'?key.provider+' terhubung. Model terbaca: '+result.modelCount:result.state==='connected'?`Koneksi AIIDE terbaca. ${result.modelCount} model tersedia; ${result.matchingVideoModels.length} cocok dengan katalog video engine. Model akun: ${(result.modelIds||[]).join(', ')}. ${key.group==='creative'?'Key ini berada di Teks & Gambar; gunakan Pindahkan ke Video untuk routing video.':''} ${result.matchingVideoModels.length?'Profil video cocok; kesiapan mengikuti kelompok dan kuota.':'Profil video belum cocok; generate tetap terkunci.'} Saldo dan keberhasilan generate belum diverifikasi.`:result.state==='rejected'?'Key ditolak atau tidak memiliki izin membaca katalog. Generate tetap nonaktif.':'Penyedia membatasi request. Tunggu sebelum memeriksa lagi; tidak ada generate baru.';
     }catch(e){const message={KEY_CHECK_COOLDOWN:'Tunggu 30 detik sebelum memeriksa key yang sama.',KEY_CHECK_UNAVAILABLE:'Koneksi provider belum dapat diperiksa. Key tidak dinyatakan valid atau gagal.',KEY_CHECK_REDIRECT_REFUSED:'Penyedia mengalihkan alamat. Pemeriksaan dihentikan agar key tidak dikirim ke host lain.'};$('pool-message').textContent=message[e.message]||'Pemeriksaan belum berhasil. Tidak ada generate yang dijalankan.';}
     finally{check.disabled=!key.enabled;await sdRenderLiveJobs();}
    });actions.append(check);
@@ -417,17 +594,22 @@ async function keyPoolsLoad(){
  window.DramasakuLang?.apply();
 }
 $('keypool-form').addEventListener('submit',async(event)=>{
- event.preventDefault();const submitButton=event.currentTarget.querySelector('button[type=submit]');if(submitButton.disabled)return;submitButton.disabled=true;$('pool-message').textContent='Menyimpan dan memeriksa key...';const secret=$('pool-secret').value;
- const body={group:$('pool-group').value,provider:$('pool-provider').value,
-   label:$('pool-label').value.trim(),secret,dailyLimit:Number($('pool-limit').value),priority:Number($('pool-priority').value),enabled:true};
- $('pool-secret').value='';
- try{await api('/api/key-pools',{method:'POST',body});$('pool-message').textContent='Kunci berhasil ditambahkan dan disimpan aman.';
-  $('pool-label').value='';await keyPoolsLoad();await sdRenderLiveJobs();$('pool-message').textContent=videoLiveHelp(sdLiveConfiguration);
- }catch(e){$('pool-message').textContent=`Gagal menyimpan: ${e.message}`;}finally{submitButton.disabled=false;}
+ event.preventDefault();const submitButton=event.currentTarget.querySelector('button[type=submit]');if(submitButton.disabled)return;submitButton.disabled=true;$('pool-message').textContent='Menyimpan dan memeriksa key...';const secret=$('pool-secret').value.trim();
+ const body=$('pool-advanced').open?{group:$('pool-group').value,provider:$('pool-provider').value,
+   label:$('pool-label').value.trim()||$('pool-provider').value.toUpperCase()+' '+($('pool-group').value==='video'?'Video':'Creative'),secret,dailyLimit:Number($('pool-limit').value),priority:Number($('pool-priority').value),enabled:true}:{secret,...($('quick-provider').value?{provider:$('quick-provider').value}:{})};
+ let saved=false;
+ try{const result=await api('/api/key-pools',{method:'POST',body});saved=true;$('pool-secret').value='';$('quick-provider').value='';$('quick-choice').hidden=true;
+  $('pool-label').value='';await keyPoolsLoad();await sdRenderLiveJobs({selectAvailableModel:true});
+  const connection=result.connection;
+  const diagnosis=!connection?'Penyedia ini belum memiliki pemeriksaan otomatis.':connection.state==='connected'&&result.key.provider!=='aiide'?result.key.provider+' terhubung. Model terbaca: '+connection.modelCount+'.':connection.state==='connected'?`Koneksi AIIDE terbaca: ${connection.matchingVideoModels.length} model video didukung.`:connection.state==='rejected'?'Key ditolak penyedia. Periksa atau ganti key.':connection.state==='rate_limited'?'Penyedia membatasi pemeriksaan. Coba Periksa Koneksi nanti.':'Koneksi belum dapat diverifikasi. Coba Periksa Koneksi nanti.';
+  $('pool-message').textContent='Key tersimpan. '+diagnosis+' '+(result.key.group==='video'&&result.key.provider==='aiide'?videoLiveHelp(sdLiveConfiguration):'Belum ada generate yang dikirim.');
+ }catch(e){if(e.message==='KEY_PROVIDER_REQUIRED'){
+   $('quick-choice').hidden=false;$('quick-provider').focus();$('pool-message').textContent='Pilih penerbit key lalu klik Tambahkan Kunci. Key masih di perangkat ini.';return;
+  }$('pool-message').textContent=saved?'Key sudah tersimpan; status belum dapat dimuat. Klik Muat ulang.':`Gagal menyimpan: ${e.message}`;}finally{submitButton.disabled=false;}
 });
 $('pool-group').addEventListener('change',()=>{$('pool-provider').value='aiide';});
 $('pool-preview-group').addEventListener('change',()=>{
- $('pool-preview-provider').value=$('pool-preview-group').value==='video'?'volcengine':'aiide';
+ $('pool-preview-provider').value='aiide';
  const policy=keyPoolData?.pools.find(p=>p.id===$('pool-preview-group').value);
  if(policy)$('pool-strategy').value=policy.strategy;
 });
@@ -525,3 +707,19 @@ $('tts-attach').addEventListener('click',async()=>{
 });
 
 $('sd-test').addEventListener('click',async()=>{const b=$('sd-test');b.disabled=true;try{const result=await api('/api/aiide-video/test',{method:'POST',body:sdInput()});$('sd-request').textContent=JSON.stringify({checks:result.checks,mode:result.plan.mode,model:result.plan.model,missingPublicReferences:result.plan.missingReferences.length,outboundRequests:0,paidCalls:0,liveVerified:false},null,2);sdText('sd-plan-status','LULUS TES LOKAL · 0 request provider · belum menghasilkan video AI.'+(result.plan.missingReferences.length?' Referensi dapat dipakai lokal; jalur live kelak membutuhkan alamat publik/aset AIIDE.':''));}catch(e){sdText('sd-plan-status',studioError(e));}finally{b.disabled=false;}});
+
+$('change-password').addEventListener('submit',async event=>{
+ event.preventDefault();
+ const form=event.currentTarget,button=form.querySelector('button'),next=$('new-password').value;
+ if(next!==$('repeat-password').value){sdText('password-status','Ulangan password berbeda.');return;}
+ button.disabled=true;
+ try{
+  await api('/api/team/password',{method:'POST',body:{currentPassword:$('old-password').value,newPassword:next}});
+  form.reset();location.hash='overview';location.reload();
+ }catch(e){
+  const hints={WRONG_PASSWORD:'Password saat ini salah.',PASSWORD_POLICY:'Gunakan minimal 6 karakter dengan huruf, angka, dan simbol.'};
+  sdText('password-status',hints[e.message]||studioError(e));
+ }finally{button.disabled=false;}
+});
+
+$('pool-secret').addEventListener('input',()=>{$('quick-provider').value='';$('quick-choice').hidden=true;});

@@ -1,6 +1,18 @@
 /** Creative-facing translations; no credentials or production data stored in browser. */
 (()=>{
  const pairs=[
+ ['Ganti Password','Change Password'],['Password tim','Team password'],['Password saat ini','Current password'],['Password baru','New password'],['Ulangi password baru','Confirm new password'],['Simpan password','Save password'],['Penerbit API key','API key issuer'],['Pilih penyedia','Select provider'],['Masukkan password tim untuk membuka studio.','Enter the team password to open the studio.'],
+ ['Perluas prompt','Expand prompt'],['Ringkas tampilan','Collapse prompt'],['Gunakan untuk Gambar','Use in Image Studio'],['Karakter dan gaya visual','Characters and visual style'],
+ ['Pilih dari pustaka lokal','Choose from local library'],['Cari nama media','Search media by name'],['Media yang dapat dilampirkan','Available media'],['Lampirkan media','Attach media'],['Belum ada media yang dapat dipilih','No available media'],['Tidak ada media yang cocok','No matching media'],['Gambar referensi','Reference images'],
+ ['Cari aktivitas, draf, atau tugas video','Search activity, drafts, or video tasks'],['Tugas video di perangkat ini','Video tasks on this device'],['Status tugas','Task status'],['Semua status','All statuses'],['Siap diputar','Ready to play'],['Dalam proses','In progress'],['Perlu diperiksa','Needs attention'],['Pakai di Studio Film','Use in Film Studio'],
+ ['Tambahkan gambar atau klip ke susunan film.','Add an image or clip to the timeline.'],['Simpan susunan terbaru sebelum render.','Save timeline changes before rendering.'],['Siap merender MP4 di perangkat ini.','Ready to render an MP4 on this device.'],
+ ['Tidak ada aktivitas yang cocok.','No matching activity.'],['Tidak ada draf yang cocok.','No matching drafts.'],['Tidak ada tugas yang cocok.','No matching tasks.'],['Belum ada tugas video di perangkat ini.','No video tasks on this device.'],
+ ['Gambar & audio MP3','Images & MP3 audio'],['Video referensi (MP4)','Video references (MP4)'],['Alat tes lokal & draf','Local tests & drafts'],['URL publik aset ini','Public URL for this asset'],
+ ['Klik tag untuk memasukkannya ke prompt. Untuk live, pasangkan file dengan URL publik aset yang sama.','Click a tag to insert it into the prompt. For live generation, pair each file with its matching public asset URL.'],
+ ['Tempel key AIIDE untuk Video. Koneksi dan katalog diperiksa tanpa membuat video.','Paste an AIIDE key for Video. Connection and catalog checks do not generate videos.'],
+ ['Pengaturan lanjutan / provider lain','Advanced settings / other providers'],
+ ['Pilih penyedia secara manual untuk key selain AIIDE. Aktivasi video otomatis saat ini hanya mendukung AIIDE.','Select the provider manually for non-AIIDE keys. Automatic video activation currently supports AIIDE only.'],
+ ['Otomatis jika dikosongkan','Automatic if left blank'],
  ['Simpan Draf Gambar','Save Image Brief'],['Siapkan di Buat Video','Prepare in Video Studio'],['Render Film Lokal','Render Local Film'],['Uji Mode Lokal','Test Mode Locally'],['Ekspor Paket Tim','Export Team Package'],['Impor Paket Tim','Import Team Package'],['Simpan Draf Gerak','Save Motion Brief'],['Setujui Aset','Approve Asset'],['Minta Revisi','Request Revision'],['Simpan Susunan','Save Timeline'],['Keluar','Sign Out'],
  ['Periksa Koneksi','Check Connection'],
  ['Buka Draf','Open Draft'],['Muat Cerita Terbaru','Load Latest Story'],['Draf versi lama tidak menyimpan teks narasi.','Older drafts did not store narration text.'],
