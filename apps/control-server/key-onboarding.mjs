@@ -20,5 +20,5 @@ export function keyOnboardingInput(input){
  }
  if(!Object.hasOwn(providers,provider))invalid('KEY_INPUT_INVALID');
  const [group,label]=providers[provider];
- return {group,provider,label,secret,dailyLimit:100,priority:5,enabled:true};
+ return {group,provider,label,secret,dailyLimit:provider==='aiide'?null:100,priority:5,enabled:true};
 }

@@ -73,11 +73,11 @@ test('Import AIIDE task by ID: authenticated GET-only recovery, no billable POST
  const task='task_existing_success_20261106';
  const fake=async(url,opts)=>{
    if(opts.method==='POST'){posts++;throw Error('Remote paid POST must not happen during recovery');}
-   if(url==='https://www.aiide.com/v1/video/generations/'+task){polls++;return Response.json({data:{task_id:task,status:'SUCCESS',result_url:'https://media.approved.example/existing.mp4?sign=redacted'}});}
-   if(url==='https://media.approved.example/existing.mp4?sign=redacted'){downloads++;return new Response(video,{headers:{'content-type':'video/mp4','content-length':String(video.length)}});}
+   if(url==='https://www.aiide.com/v1/video/generations/'+task){polls++;return Response.json({data:{task_id:task,status:'SUCCESS',result_url:'https://ark-acg-ap-southeast-1.tos-ap-southeast-1.volces.com/existing.mp4?sign=redacted'}});}
+   if(url==='https://ark-acg-ap-southeast-1.tos-ap-southeast-1.volces.com/existing.mp4?sign=redacted'){downloads++;return new Response(video,{headers:{'content-type':'video/mp4','content-length':String(video.length)}});}
    throw Error('Unexpected remote URL');
  };
- const app=createLocalConsole({port:44000+Math.floor(Math.random()*10000),adminToken:'test-aiide-recovery-operator-1234567',vaultKey:randomBytes(32).toString('base64'),vaultFile:join(root,'secret.enc.json'),aiideReadOnlyEnabled:true,aiideVideoEnabled:false,aiideVideoFetchImpl:fake,aiideMediaHosts:['media.approved.example']});
+ const app=createLocalConsole({port:44000+Math.floor(Math.random()*10000),adminToken:'test-aiide-recovery-operator-1234567',vaultKey:randomBytes(32).toString('base64'),vaultFile:join(root,'secret.enc.json'),aiideReadOnlyEnabled:true,aiideVideoEnabled:false,aiideVideoFetchImpl:fake});
  await app.listen();const base=`http://127.0.0.1:${app.server.address().port}`;let cookie='',csrf='';
  async function call(path,method='GET',body){const r=await fetch(base+path,{method,headers:{...(cookie?{cookie}:{}),...(method!=='GET'?{origin:base,'x-dramasaku-csrf':csrf,'content-type':'application/json'}:{})},body:method==='GET'?undefined:JSON.stringify(body||{})});const set=r.headers.get('set-cookie');if(set?.startsWith('ds_session='))cookie=set.split(';')[0];const data=await r.json();if(data.csrf)csrf=data.csrf;return {status:r.status,data};}
  try{
@@ -89,7 +89,7 @@ test('Import AIIDE task by ID: authenticated GET-only recovery, no billable POST
   assert.equal(before.data.availableAccounts.length,1);
   const imported=await call('/api/aiide-video/import','POST',{providerTaskId:task,keyId:before.data.availableAccounts[0].id});
   assert.equal(imported.status,201);assert.equal(imported.data.job.status,'ready');assert.equal(imported.data.job.source,'imported');
-  assert.equal(imported.data.job.providerTaskId,task);assert.equal(imported.data.job.resultHost,'media.approved.example');
+  assert.equal(imported.data.job.providerTaskId,task);assert.equal(imported.data.job.resultHost,'ark-acg-ap-southeast-1.tos-ap-southeast-1.volces.com');
   assert.equal((await call('/api/aiide-video/status')).data.usedToday,0);
   assert.equal((await call('/api/aiide-video/submit','POST',{input,consent:'I_ACCEPT_PROVIDER_CHARGES'})).status,403);
   const same=await call('/api/aiide-video/import','POST',{providerTaskId:task});assert.equal(same.data.job.id,imported.data.job.id);

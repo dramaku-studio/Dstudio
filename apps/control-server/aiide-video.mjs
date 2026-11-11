@@ -1,4 +1,4 @@
-/** Local AIIDE video pilot. One paid POST per UTC day, with durable intent before dispatch.
+/** Local AIIDE video pilot. Manual paid submission with durable intent before dispatch.
  * Real account/model contract cannot be verified until the owner tests the key.
  */
 import {mkdir,readFile,writeFile,rename,stat,lstat} from 'node:fs/promises';
@@ -27,14 +27,28 @@ export function createAiideVideoEngine({root,keyPool,fetchImpl=fetch,enabled=fal
  const folder=resolve(root),index=join(folder,'aiide-video-jobs.json');let jobs=[],initialized=false,chain=Promise.resolve();
  const serial=fn=>{const r=chain.then(fn);chain=r.catch(()=>{});return r;};
  const storage=createLocalVideoStore({root:join(folder,'mp4'),maxBytes:120*1024*1024,requireFfprobe:true});
- // Exact result hosts in AIIDE's published status examples (464722027e0 and 464722021e0).
- const mediaHosts=['ark-content-generation-cn-beijing.tos-cn-beijing.volces.com','dashscope-a717.oss-accelerate.aliyuncs.com',...allowedMediaHosts];
+ // Exact result hosts from AIIDE examples and BytePlus's documented Seedance output buckets.
+ const mediaHosts=[
+  'ark-content-generation-cn-beijing.tos-cn-beijing.volces.com',
+  'ark-acg-ap-southeast-1.tos-ap-southeast-1.volces.com',
+  'ark-content-generation-ap-southeast-1.tos-ap-southeast-1.volces.com',
+  'dashscope-a717.oss-accelerate.aliyuncs.com',
+  ...allowedMediaHosts
+ ];
  const pub=j=>({id:j.id,provider:'aiide',source:j.source||'local_generation',model:j.model,mode:j.mode||null,createdAt:j.createdAt,updatedAt:j.updatedAt,status:j.status,providerTaskId:j.providerTaskId||null,mediaSha256:j.mediaSha256||null,mediaBytes:j.mediaBytes||null,mediaDuration:j.mediaDuration||null,assetId:j.assetId&&resolveAsset(j.assetId)?j.assetId:null,assetError:j.assetError||null,errorCode:j.errorCode||null,resultHost:j.resultHost||null});
  const ready=()=>{if(!initialized)throw bad('AIIDE_NOT_INITIALIZED',503);};
  const find=id=>{if(!jobId.test(id||''))throw bad('AIIDE_JOB_NOT_FOUND',404);const j=jobs.find(x=>x.id===id);if(!j)throw bad('AIIDE_JOB_NOT_FOUND',404);return j;};
  async function save(){const tmp=join(folder,`.aiide-${randomBytes(8).toString('hex')}.tmp`);await writeFile(tmp,JSON.stringify({version:1,jobs}),{flag:'wx',mode:0o600});await rename(tmp,index);}
  async function adapter(j){const secret=await keyPool.getForInternalTask(j.keyId,'video','aiide');return createAiideVideoAdapter({apiKey:secret,modelId:j.source==='imported'?null:j.model||null,fetchImpl,networkAllowed:enabled||!!activation||readOnlyEnabled});}
  async function accounts(){const pool=await keyPool.list();return pool.pools.find(p=>p.id==='video')?.keys.filter(k=>k.provider==='aiide'&&k.enabled)||[];}
+ const dailyCap=key=>key?.dailyLimit===null?null:maxDaily;
+ const usedToday=()=>jobs.filter(j=>j.source!=='imported'&&j.createdAt.slice(0,10)===clock()).length;
+ function checkDispatch(key,hash){
+  const cap=dailyCap(key);
+  if(cap!==null&&usedToday()>=cap)throw bad('AIIDE_ONE_JOB_PER_DAY',429);
+  const duplicate=jobs.some(j=>j.requestHash===hash&&(cap===null?!done.has(j.status):j.createdAt.slice(0,10)===clock()));
+  if(duplicate)throw bad('AIIDE_DUPLICATE_JOB',409);
+ }
  async function archive(j){
   if(!archiveVideo||j.assetId)return;
   try{
@@ -73,7 +87,7 @@ export function createAiideVideoEngine({root,keyPool,fetchImpl=fetch,enabled=fal
   },
   // Only known provider task IDs are polled. A restart must never resubmit a job.
   pendingIds(){return jobs.filter(j=>j.providerTaskId&&['submitted','queued','running','download_pending'].includes(j.status)&&!j.errorCode).map(j=>j.id);},
-  async list(){ready();const pool=await keyPool.preview('video','aiide');const keys=await accounts();const readiness=activation?await activation.status():null;return {provider:'aiide',enabled:readiness?readiness.ready:enabled,readOnlyEnabled,capabilityVerified,credentialVerified:readiness?.ready||false,activationState:readiness?.state||'manual',availableModels:readiness?.models||[],autoActivation:!!activation,configured:keys.length>0,maxDaily,usedToday:jobs.filter(j=>j.source!=='imported'&&j.createdAt.slice(0,10)===clock()).length,autoRetry:false,costEstimate:'provider_quote_required',modelCompatibility:'AIIDE public contracts 2026-11-08; local tests only, live account unverified',availableAccounts:keys.map(k=>({id:k.id,label:k.label})),jobs:jobs.slice(-30).reverse().map(pub)};},
+  async list(){ready();const pool=await keyPool.preview('video','aiide');const keys=await accounts();const readiness=activation?await activation.status():null;return {provider:'aiide',enabled:readiness?readiness.ready:enabled,readOnlyEnabled,capabilityVerified,credentialVerified:readiness?.ready||false,activationState:readiness?.state||'manual',availableModels:readiness?.models||[],autoActivation:!!activation,configured:keys.length>0,maxDaily:dailyCap(pool.selected),usedToday:usedToday(),autoRetry:false,costEstimate:'provider_quote_required',modelCompatibility:'AIIDE public contracts 2026-11-08; local tests only, live account unverified',availableAccounts:keys.map(k=>({id:k.id,label:k.label})),jobs:jobs.slice(-30).reverse().map(pub)};},
   // Import a task already created on AIIDE. Only GET status and GET media; no billable POST.
   async importTask({providerTaskId,keyId}={},projectId=null){ready();if(!readOnlyEnabled)throw bad('AIIDE_READ_ONLY_IMPORT_DISABLED',403);
    if(typeof providerTaskId!=='string'||!importedTaskId.test(providerTaskId))throw bad('AIIDE_TASK_ID_INVALID',422);
@@ -95,15 +109,18 @@ export function createAiideVideoEngine({root,keyPool,fetchImpl=fetch,enabled=fal
   async submit({input,consent,expectedRequestHash}={},projectId=null){ready();if(!enabled&&!activation)throw bad('AIIDE_VIDEO_DISABLED',403);if(!activation&&!capabilityVerified)throw bad('AIIDE_MODEL_PROFILE_UNVERIFIED',403);if(consent!=='I_ACCEPT_PROVIDER_CHARGES')throw bad('AIIDE_COST_CONSENT_REQUIRED',403);
    const plan=compileAiideRequest(input,resolveAsset,{forDispatch:true});
    if(expectedRequestHash!==undefined&&expectedRequestHash!==plan.requestHash)throw bad('AIIDE_REQUEST_CHANGED',409);
-   return serial(async()=>{if(jobs.filter(j=>j.source!=='imported'&&j.createdAt.slice(0,10)===clock()).length>=maxDaily)throw bad('AIIDE_ONE_JOB_PER_DAY',429);
-    if(jobs.some(j=>j.source!=='imported'&&j.requestHash===plan.requestHash&&j.createdAt.slice(0,10)===clock()))throw bad('AIIDE_DUPLICATE_JOB',409);
-    const check=await keyPool.preview('video','aiide');if(!check.selected)throw bad('AIIDE_NO_ACTIVE_KEY',409);
-    const reserved=activation?await keyPool.reserveForInternalDispatch('video','aiide',{authorize:key=>activation.authorize(key.id,plan.model)}):null;
-    const now=new Date().toISOString();const job={id:randomBytes(12).toString('hex'),model:plan.model,mode:plan.mode,projectId,source:'local_generation',requestHash:plan.requestHash,createdAt:now,updatedAt:now,status:'submission_unknown'};
+   return serial(async()=>{
+    if(jobs.length>=500)throw bad('AIIDE_HISTORY_FULL',409);
+    const {selected}=await keyPool.preview('video','aiide');if(!selected)throw bad('AIIDE_NO_ACTIVE_KEY',409);
+    checkDispatch(selected,plan.requestHash);
+    const reserved=await keyPool.reserveForInternalDispatch('video','aiide',{authorize:async key=>{
+     checkDispatch(key,plan.requestHash);
+     if(activation)await activation.authorize(key.id,plan.model);
+    }});
+    const now=new Date().toISOString();const job={id:randomBytes(12).toString('hex'),model:plan.model,mode:plan.mode,projectId,source:'local_generation',keyId:reserved.keyId,requestHash:plan.requestHash,createdAt:now,updatedAt:now,status:'submission_unknown'};
     jobs.push(job);await save(); // intent durable BEFORE paid call
     try{
-     const dispatchKey=reserved||await keyPool.reserveForInternalDispatch('video','aiide');job.keyId=dispatchKey.keyId;await save();
-     const a=createAiideVideoAdapter({apiKey:dispatchKey.secret,fetchImpl,networkAllowed:enabled||!!activation});
+     const a=createAiideVideoAdapter({apiKey:reserved.secret,fetchImpl,networkAllowed:enabled||!!activation});
      const r=await a.submit(plan);job.providerTaskId=r.providerTaskId;job.status='submitted';job.errorCode=null;
     }catch(e){job.status='submission_unknown';job.errorCode=e.code||'AIIDE_SUBMISSION_UNKNOWN';}
     job.updatedAt=new Date().toISOString();await save();return pub(job);

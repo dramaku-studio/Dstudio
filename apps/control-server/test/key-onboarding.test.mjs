@@ -9,7 +9,7 @@ import {keyOnboardingInput} from '../key-onboarding.mjs';
 const secret='mock-aiide-onboarding-secret-123456';
 const model='dreamina-seedance-2-5-hc';
 test('explicit AIIDE onboarding selects Video; explicit advanced providers are preserved',()=>{
- assert.deepEqual(keyOnboardingInput({secret,provider:'aiide'}),{secret,group:'video',provider:'aiide',label:'AIIDE Video',dailyLimit:100,priority:5,enabled:true});
+ assert.deepEqual(keyOnboardingInput({secret,provider:'aiide'}),{secret,group:'video',provider:'aiide',label:'AIIDE Video',dailyLimit:null,priority:5,enabled:true});
  const advanced={secret,group:'creative',provider:'openai',label:'Text account'};
  assert.deepEqual(keyOnboardingInput(advanced),advanced);
  for(const input of [null,[],{}, {secret,url:'https://attacker.invalid'}, {secret,provider:'invalid'}, {secret,group:'video'}])assert.throws(()=>keyOnboardingInput(input),/KEY_INPUT_INVALID/);

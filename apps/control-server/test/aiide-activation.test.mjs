@@ -44,3 +44,20 @@ test('cached valid key cannot bypass fresh validation; consent and parallel subm
 });
 
 test('current AIIDE Model Plaza IDs activate only documented video models',async t=>{const x=await setup(t);await x.add();const models=['dreamina-seedance-2-0-fast-hc','dreamina-seedance-2-0-hc','dreamina-seedance-2-0-mini-hc','dreamina-seedance-2-5-hc','doubao-seedance-2-0-mini-260615','doubao-seedance-2-5-260628'];x.setModels([...models,'gpt-image-2','unknown-future-video']);const status=await x.engine.list();assert.equal(status.enabled,true);assert.deepEqual(status.availableModels,models);assert.deepEqual(x.counts(),{gets:1,posts:0});});
+
+test('AIIDE provider quota is opt-in per key and allows separate confirmed requests',async t=>{
+ const x=await setup(t),key=await x.add();
+ const submit=(prompt)=>x.engine.submit({input:{...input,prompt},consent:'I_ACCEPT_PROVIDER_CHARGES'});
+ await submit(input.prompt);
+ assert.equal((await x.engine.list()).maxDaily,1);
+ const changed=await x.keys.update({id:key.id,dailyLimit:null});
+ assert.equal(changed.remaining,null);
+ assert.equal((await x.engine.list()).maxDaily,null);
+ await assert.rejects(submit(input.prompt),{code:'AIIDE_DUPLICATE_JOB'});
+ await assert.rejects(x.engine.submit({input}),{code:'AIIDE_COST_CONSENT_REQUIRED'});
+ await submit(input.prompt+' Pan slowly to the left.');
+ assert.equal(x.counts().posts,2);
+ assert.equal((await x.engine.list()).usedToday,2);
+ await x.keys.update({id:key.id,dailyLimit:100});
+ await assert.rejects(submit(input.prompt+' A third camera angle.'),{code:'AIIDE_ONE_JOB_PER_DAY'});
+});

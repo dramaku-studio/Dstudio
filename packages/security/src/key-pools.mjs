@@ -18,8 +18,13 @@ const validInt=(value,min,max,code)=>{
 const validGroup=(value)=>{if(!GROUPS.includes(value))throw bad('INVALID_KEY_GROUP');return value;};
 const validProvider=(value)=>{if(!PROVIDERS.includes(value))throw bad('INVALID_KEY_PROVIDER');return value;};
 const validStrategy=(value)=>{if(!STRATEGIES.includes(value))throw bad('INVALID_ROUTING_STRATEGY');return value;};
+function validateDailyLimit(value,group,provider){
+ if(value===null&&group==='video'&&provider==='aiide')return;
+ validInt(value,1,100000,'INVALID_DAILY_LIMIT');
+}
+const remaining=(item,day)=>item.dailyLimit===null?null:item.dailyLimit-(item.usageDay===day?item.usedToday:0);
 const mask=(item,now)=>({id:item.id,label:item.label,provider:item.provider,group:item.group,enabled:item.enabled,
- dailyLimit:item.dailyLimit,usedToday:item.usageDay===now?item.usedToday:0,remaining:item.dailyLimit-(item.usageDay===now?item.usedToday:0),
+ dailyLimit:item.dailyLimit,usedToday:item.usageDay===now?item.usedToday:0,remaining:remaining(item,now),
  priority:item.priority,createdAt:item.createdAt});
 
 export function createEncryptedKeyPools({file,key,clock=today}={}){
@@ -58,7 +63,7 @@ export function createEncryptedKeyPools({file,key,clock=today}={}){
    try{await rename(tmp,filename);}catch(e){await unlink(tmp).catch(()=>{});throw e;}
  }
  function eligible(data,group,provider,day){
-   return data.items.filter(i=>i.group===group&&i.provider===provider&&i.enabled&&(i.usageDay===day?i.usedToday:0)<i.dailyLimit)
+   return data.items.filter(i=>i.group===group&&i.provider===provider&&i.enabled&&(i.dailyLimit===null||remaining(i,day)>0))
     .sort((a,b)=>a.priority-b.priority||a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));
  }
  function choose(data,group,provider,day){
@@ -74,7 +79,7 @@ export function createEncryptedKeyPools({file,key,clock=today}={}){
      validGroup(group);validProvider(provider);
      if(typeof label!=='string'||label.trim().length<2||label.length>80)throw bad('INVALID_KEY_LABEL');
      if(typeof secret!=='string'||secret.trim().length<12||secret.length>8192||secret.includes('\0'))throw bad('INVALID_KEY_SECRET');
-     validInt(dailyLimit,1,100000,'INVALID_DAILY_LIMIT');validInt(priority,1,10,'INVALID_PRIORITY');
+     validateDailyLimit(dailyLimit,group,provider);validInt(priority,1,10,'INVALID_PRIORITY');
      if(typeof enabled!=='boolean')throw bad('INVALID_ENABLED_FLAG');
      return serialize(async()=>{
        const data=await read();if(data.items.length>=50)throw bad('KEY_POOL_FULL');
@@ -87,11 +92,10 @@ export function createEncryptedKeyPools({file,key,clock=today}={}){
    },
    async update({id,dailyLimit,priority,enabled}={}){
      if(typeof id!=='string'||!/^[a-f0-9]{24}$/.test(id))throw bad('INVALID_KEY_ID');
-     if(dailyLimit!==undefined)validInt(dailyLimit,1,100000,'INVALID_DAILY_LIMIT');
      if(priority!==undefined)validInt(priority,1,10,'INVALID_PRIORITY');
      if(enabled!==undefined&&typeof enabled!=='boolean')throw bad('INVALID_ENABLED_FLAG');
      return serialize(async()=>{const data=await read(),item=data.items.find(i=>i.id===id);if(!item)throw bad('KEY_NOT_FOUND');
-       if(dailyLimit!==undefined)item.dailyLimit=dailyLimit;if(priority!==undefined)item.priority=priority;if(enabled!==undefined)item.enabled=enabled;
+       if(dailyLimit!==undefined){validateDailyLimit(dailyLimit,item.group,item.provider);item.dailyLimit=dailyLimit;}if(priority!==undefined)item.priority=priority;if(enabled!==undefined)item.enabled=enabled;
        await save(data);return mask(item,clock());});
    },
    async moveToVideo(id){
@@ -130,7 +134,7 @@ export function createEncryptedKeyPools({file,key,clock=today}={}){
        item.usedToday+=1;
        if(data.policies[group]==='round_robin'){data.cursor[group]??={};data.cursor[group][provider]=(data.cursor[group][provider]||0)+1;}
        await save(data);
-       return {keyId:item.id,provider:item.provider,secret:decode(item.id,item.secret),remaining:item.dailyLimit-item.usedToday};
+       return {keyId:item.id,provider:item.provider,secret:decode(item.id,item.secret),remaining:remaining(item,day)};
      });
    }
  });

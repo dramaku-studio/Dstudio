@@ -187,15 +187,16 @@ function sdRenderAssets(){
   label.append(field);link.append(label,message);row.append(link);(a.kind==='video'?videoTarget:target).append(row);
  }
 }
-function sdCanGenerate(live){return !!(live?.enabled&&(live.capabilityVerified||live.credentialVerified)&&live.configured&&live.usedToday<live.maxDaily&&(!live.autoActivation||live.availableModels.includes($('sd-model').value)));}
+function sdCanGenerate(live){return !!(live?.enabled&&(live.capabilityVerified||live.credentialVerified)&&live.configured&&(live.maxDaily===null||live.usedToday<live.maxDaily)&&(!live.autoActivation||live.availableModels.includes($('sd-model').value)));}
 function videoLiveHelp(live){
  if(live?.activationState==='catalog_not_supported')return 'Key terhubung, tetapi model akun belum memiliki profil request yang didukung engine. Generate tetap terkunci; lihat daftar model melalui Periksa Koneksi.';
  if(!live?.enabled)return live?.autoActivation?'Engine belum siap ('+live.activationState+'). Tambahkan key Video / AIIDE yang valid dan memiliki model video. Uji Mode Lokal tetap tersedia.':'Mode offline: generate berbayar OFF.';
  if(!live?.configured)return 'Akun AIIDE belum terhubung. Periksa Kunci API sebelum membuat video.';
  if(!live.enabled)return 'Video baru belum diaktifkan. Video lama tetap bisa diambil tanpa membuat ulang.';
  if(!(live.capabilityVerified||live.credentialVerified))return 'Izin uji model belum diaktifkan. Konfirmasi model dan biaya pada akun AIIDE dahulu.';
- if(live.usedToday>=live.maxDaily)return 'Batas 1 generate per hari tercapai. Buka hasil yang sudah ada, jangan mengulang.';
+ if(live.maxDaily!==null&&live.usedToday>=live.maxDaily)return 'Batas 1 generate per hari tercapai. Buka hasil yang sudah ada, jangan mengulang.';
  if(live.autoActivation&&!live.availableModels.includes($('sd-model').value))return 'Model ini tidak tersedia pada katalog key terpilih. Pilih model yang tersedia.';
+ if(live.maxDaily===null)return 'Engine siap. AIIDE menentukan saldo dan kuota saat permintaan dikirim. Konfirmasi biaya diperlukan setiap kali Generate.';
  return 'Key dan katalog siap. Saldo serta keberhasilan generate belum diverifikasi. Konfirmasi biaya diperlukan sebelum mengirim.';
 }
 function showEngineState(live){
@@ -209,7 +210,7 @@ function showEngineState(live){
  const count=live?.availableModels?.length||0;
  sdText('engine-model-count',String(count));
  $('engine-matches').hidden=!connected||!count;
- sdText('engine-hint',connected?(live.usedToday>=live.maxDaily?'Batas generate harian tercapai.':'Generate memerlukan konfirmasi biaya.'):'Uji Mode Lokal tanpa biaya.');
+ sdText('engine-hint',connected?(live.maxDaily!==null&&live.usedToday>=live.maxDaily?'Batas generate harian tercapai.':'Generate memerlukan konfirmasi biaya.'):'Uji Mode Lokal tanpa biaya.');
 }
 async function sdLiveStatus(){
  try{
@@ -614,7 +615,8 @@ async function keyPoolsLoad(){
   const card=document.createElement('article');card.className='key-item';
   const info=document.createElement('div');
   const title=document.createElement('strong');title.textContent=key.label;
-  const sub=document.createElement('small');sub.textContent=`${key.group==='creative'?'Teks & Gambar':'Video'} · ${key.provider.toUpperCase()} · Sisa lokal: ${key.remaining}/${key.dailyLimit} permintaan`;
+  const quota=key.dailyLimit===null?'Mengikuti saldo dan batas AIIDE':`Sisa lokal: ${key.remaining}/${key.dailyLimit} permintaan`;
+  const sub=document.createElement('small');sub.textContent=`${key.group==='creative'?'Teks & Gambar':'Video'} · ${key.provider.toUpperCase()} · ${quota}`;
   info.append(title,sub);
   const actions=document.createElement('div');actions.className='key-item-actions';
   const pill=document.createElement('span');pill.className='pill subtle';pill.textContent=key.enabled?'Aktif':'Nonaktif';
@@ -666,7 +668,7 @@ $('pool-policy-save').addEventListener('click',async()=>{
 });
 $('pool-check').addEventListener('click',async()=>{
  try{const data=await api('/api/key-pools/preview',{method:'POST',body:{group:$('pool-preview-group').value,provider:$('pool-preview-provider').value}});
- $('pool-preview-result').textContent=data.selected?`Pilihan: ${data.selected.label} (${data.selected.remaining} permintaan lokal tersisa). Ini hanya simulasi.`:'Belum ada kunci aktif dengan kuota lokal untuk penyedia tersebut.';
+ $('pool-preview-result').textContent=data.selected?`Pilihan: ${data.selected.label} (${data.selected.dailyLimit===null?'mengikuti batas AIIDE':data.selected.remaining+' permintaan lokal tersisa'}). Ini hanya simulasi.`:'Belum ada kunci aktif dengan kuota lokal untuk penyedia tersebut.';
  }catch(e){$('pool-preview-result').textContent=e.message;}
 });
 $('pool-reload').addEventListener('click',()=>keyPoolsLoad().catch(e=>{$('pool-message').textContent=e.message;}));
