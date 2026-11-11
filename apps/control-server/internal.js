@@ -11,7 +11,7 @@ const internalExpected=()=>({expectedProjectHash:internalState?.projectHash??nul
 async function internalChange(action,body,statusId){try{await api('/api/production/'+action,{method:'POST',body:{...body,...internalExpected()}});await internalReload();if(statusId&&action!=='render')$(statusId).textContent='Tersimpan di proyek lokal.';return true;}catch(e){if(statusId)$(statusId).textContent=studioError(e);return false;}}
 function internalMedia(asset){
  const el=document.createElement(asset.kind==='image'?'img':asset.kind==='video'?'video':'audio');
- el.src=`/api/seedance/assets/${asset.id}/media`;el.className='internal-media';
+ el.src=asset.generatedJobId?'/api/aiide-video/jobs/'+asset.generatedJobId+'/media':`/api/seedance/assets/${asset.id}/media`;el.className='internal-media';
  if(asset.kind==='image')el.alt=asset.name;else{el.controls=true;el.preload='metadata';}
  return el;
 }
@@ -40,6 +40,10 @@ function paintAssetLibrary(){
   preview.append(internalMedia(asset),remove);
   const limit=new Date(asset.expiresAt||Date.parse(asset.createdAt)+72*3600000);
   card.append(preview,internalNode('strong',asset.name),internalNode('small','Hapus otomatis '+limit.toLocaleString()));
+  if(asset.generatedJobId){
+   const link=internalNode('a','Unduh MP4');link.href='/api/aiide-video/jobs/'+asset.generatedJobId+'/media?download=1';link.download=asset.name;
+   card.append(internalNode('small','Hasil generate AIIDE'),link);
+  }
   if(asset.kind!=='audio'||asset.mime==='audio/mpeg'){
    card.append(internalButton('Lampirkan ke video',async()=>{
     try{

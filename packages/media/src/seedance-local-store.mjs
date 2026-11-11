@@ -49,15 +49,22 @@ export function createSeedanceLocalStore({root,clock=Date.now}={}){
   await removeFiles([id]);
  });},
  resolveAsset(id){return validId.test(String(id))?assets.find(x=>x.id===id):null;},
- async addAsset(bytes,name,{projectId=null}={}){return serialize(async()=>{
-  if(!Buffer.isBuffer(bytes)||bytes.length>20*1024*1024||bytes.length<12)throw new AssetValidationError('ASSET_SIZE_INVALID');
-  const type=sniff(bytes);if(bytes.length>type.max)throw new AssetValidationError('ASSET_TOO_LARGE');
+ async addAsset(bytes,name,{projectId=null,generatedJobId=null,fromPackage=false}={}){return serialize(async()=>{
+  if(generatedJobId&&!validId.test(generatedJobId))throw new AssetValidationError('INVALID_JOB_ID');
+  const existing=generatedJobId&&assets.find(a=>a.generatedJobId===generatedJobId&&a.projectId===projectId);
+  if(existing)return structuredClone(existing);
+  const maxBytes=(generatedJobId?120:fromPackage?64:20)*1024*1024;
+  if(!Buffer.isBuffer(bytes)||bytes.length>maxBytes||bytes.length<12)throw new AssetValidationError('ASSET_SIZE_INVALID');
+  const type=sniff(bytes);if(bytes.length>(type.kind==='video'?maxBytes:type.max))throw new AssetValidationError('ASSET_TOO_LARGE');
   if(assets.length>=250||assets.reduce((total,a)=>total+a.bytes,0)+bytes.length>500*1024*1024)throw new AssetValidationError('LOCAL_STORAGE_QUOTA');
   if(typeof name!=='string'||!name.trim()||name.length>180)throw new AssetValidationError('INVALID_ASSET_NAME');
   const clean=name.replace(/[\x00-\x1f\x7f]/g,'').split(/[\\/]/).pop().slice(0,120)||'attachment';
   const id=randomBytes(12).toString('hex'),path=join(folder,id+'.bin');
   const f=await open(path,'wx',0o600);try{await f.writeFile(bytes);}finally{await f.close();}
-  const asset={id,name:clean,kind:type.kind,mime:type.mime,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),createdAt:new Date(clock()).toISOString(),projectId};assets.push(asset);await persist();return asset;
+  const asset={id,name:clean,kind:type.kind,mime:type.mime,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),createdAt:new Date(clock()).toISOString(),projectId,...(generatedJobId?{generatedJobId}:{})};
+  const next=[...assets,asset];
+  try{await persist(next);}catch(e){await rm(path,{force:true});throw e;}
+  assets=next;return structuredClone(asset);
  });},
  async inspectAsset(id){
   const asset=this.resolveAsset(id);if(!asset)throw new AssetValidationError('ASSET_NOT_FOUND');

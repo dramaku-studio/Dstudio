@@ -18,7 +18,7 @@ function validate(bundle){
  if(!Array.isArray(p.assets)||p.assets.length>100||!Array.isArray(p.videoDrafts)||p.videoDrafts.length>100||!Array.isArray(p.voiceDrafts)||p.voiceDrafts.length>200)throw bad('PACKAGE_LIMIT');
  let total=0;const registry=new Map();
  for(const a of p.assets){
-  if(!exact(a,['id','name','kind','sha256','data'])||!id.test(a.id)||registry.has(a.id)||typeof a.name!=='string'||!a.name.trim()||a.name.length>120||!['image','video','audio'].includes(a.kind)||typeof a.data!=='string'||a.data.length>28_000_000)throw bad('PACKAGE_ASSET_INVALID');
+  if(!exact(a,['id','name','kind','sha256','data'])||!id.test(a.id)||registry.has(a.id)||typeof a.name!=='string'||!a.name.trim()||a.name.length>120||!['image','video','audio'].includes(a.kind)||typeof a.data!=='string'||a.data.length>(a.kind==='video'?Math.ceil(64*1024*1024/3)*4:28_000_000))throw bad('PACKAGE_ASSET_INVALID');
   const bytes=Buffer.from(a.data,'base64');total+=bytes.length;if(bytes.toString('base64')!==a.data||bytes.length<12||sha(bytes)!==a.sha256||total>64*1024*1024)throw bad('PACKAGE_ASSET_INTEGRITY');registry.set(a.id,a);
  }
  const ps=p.production;if(!exact(ps,['briefs','reviews','timeline','events'])||!Array.isArray(ps.briefs)||ps.briefs.length>200||!Array.isArray(ps.reviews)||ps.reviews.length>100||!Array.isArray(ps.events)||ps.events.length>200||!exact(ps.timeline,['clips','audioAssetId'])||!Array.isArray(ps.timeline.clips)||ps.timeline.clips.length>24)throw bad('PACKAGE_PRODUCTION_INVALID');
@@ -58,7 +58,7 @@ export function createProjectPackages({root,workspace,assets,production,tts}){
    const temporary=await mkdtemp(join(root,'package-stage-'));
    try{
     const stage=createSeedanceLocalStore({root:temporary});await stage.init();const staged=new Map();
-    for(const a of p.assets){const added=await stage.addAsset(Buffer.from(a.data,'base64'),a.name);if(added.kind!==a.kind)throw bad('PACKAGE_ASSET_TYPE_MISMATCH');const inspected=await stage.inspectAsset(added.id);staged.set(a.id,{...inspected,id:a.id});}
+    for(const a of p.assets){const added=await stage.addAsset(Buffer.from(a.data,'base64'),a.name,{fromPackage:true});if(added.kind!==a.kind)throw bad('PACKAGE_ASSET_TYPE_MISMATCH');const inspected=await stage.inspectAsset(added.id);staged.set(a.id,{...inspected,id:a.id});}
     for(const d of p.videoDrafts)compileAiideRequest(d,id=>staged.get(id));
     for(const c of p.production.timeline.clips){const a=staged.get(c.assetId);if(a.kind==='audio'||(a.kind==='image'&&c.start!==0)||(a.kind==='video'&&c.start+c.duration>a.durationSeconds+0.1))throw bad('PACKAGE_TIMELINE_INVALID');}
     if(p.production.timeline.audioAssetId&&staged.get(p.production.timeline.audioAssetId).kind!=='audio')throw bad('PACKAGE_TIMELINE_INVALID');
@@ -66,7 +66,7 @@ export function createProjectPackages({root,workspace,assets,production,tts}){
    // Save a recoverable package before replacing the active project. Credentials are excluded.
    if(current){const backup=await this.export();await mkdir(join(root,'project-backups'),{recursive:true,mode:0o700});await writeFile(join(root,'project-backups',Date.now()+'-'+randomBytes(4).toString('hex')+'.studio.json'),JSON.stringify(backup),{mode:0o600,flag:'wx'});}
    const mapping=new Map(),used=new Set();
-   for(const a of p.assets){const existing=assets.listAssets().find(x=>x.sha256===a.sha256&&x.projectId===p.projectId&&!used.has(x.id));const added=existing||await assets.addAsset(Buffer.from(a.data,'base64'),a.name,{projectId:p.projectId});if(added.kind!==a.kind)throw bad('PACKAGE_ASSET_TYPE_MISMATCH');await assets.inspectAsset(added.id);mapping.set(a.id,added.id);used.add(added.id);}
+   for(const a of p.assets){const existing=assets.listAssets().find(x=>x.sha256===a.sha256&&x.projectId===p.projectId&&!used.has(x.id));const added=existing||await assets.addAsset(Buffer.from(a.data,'base64'),a.name,{projectId:p.projectId,fromPackage:true});if(added.kind!==a.kind)throw bad('PACKAGE_ASSET_TYPE_MISMATCH');await assets.inspectAsset(added.id);mapping.set(a.id,added.id);used.add(added.id);}
    const convert=id=>mapping.get(id);
    const imported=structuredClone(p.production);
    imported.reviews=imported.reviews.map(r=>({...r,assetId:convert(r.assetId),decision:'revision',note:('Impor: konfirmasi ulang review. '+r.note).slice(0,1000)}));

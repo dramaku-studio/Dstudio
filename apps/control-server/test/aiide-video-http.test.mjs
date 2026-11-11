@@ -19,7 +19,7 @@ async function harness({enabled=false,verified=false}={}){
  const app=createLocalConsole({port:44000+Math.floor(Math.random()*10000),adminToken:'test-aiide-video-operator-1234567',vaultKey:randomBytes(32).toString('base64'),vaultFile:join(root,'secret.enc.json'),aiideVideoEnabled:enabled,aiideVideoCapabilityVerified:verified,aiideVideoFetchImpl:fake,aiideMediaHosts:['video.cdn.example']});
  await app.listen();const base=`http://127.0.0.1:${app.server.address().port}`;let cookie='',csrf='';
  async function call(path,method='GET',body){const r=await fetch(base+path,{method,headers:{...(cookie?{cookie}:{}),...(method!=='GET'?{origin:base,'x-dramasaku-csrf':csrf,'content-type':'application/json'}:{})},body:method==='GET'?undefined:JSON.stringify(body||{})});const set=r.headers.get('set-cookie');if(set?.startsWith('ds_session='))cookie=set.split(';')[0];const json=await r.json();if(json.csrf)csrf=json.csrf;return {status:r.status,data:json};}
- const binary=async(path)=>fetch(base+path,{headers:{cookie}});
+ const binary=async(path,headers={})=>fetch(base+path,{headers:{cookie,...headers}});
  return {app,base,call,binary,getStats:()=>({posts,polls,downloads}),close:async()=>{await new Promise(resolve=>app.server.close(resolve));await rm(root,{recursive:true,force:true});}};
 }
 test('AIIDE local HTTP gate: no login, no key, no capability = no paid request',async()=>{
@@ -47,6 +47,21 @@ test('AIIDE local HTTP: authenticated paid POST > status GET > verified MP4 down
   const authorized=await h.binary(`/api/aiide-video/jobs/${task}/media`);
   assert.equal(authorized.status,200);assert.equal(authorized.headers.get('content-type'),'video/mp4');
   const raw=new Uint8Array(await authorized.arrayBuffer());assert.equal(String.fromCharCode(...raw.slice(4,8)),'ftyp');
+  const gallery=(await h.call('/api/seedance/assets')).data.assets;
+  assert.equal(gallery.length,1);
+  assert.equal(gallery[0].id,poll.data.job.assetId);
+  assert.equal(gallery[0].generatedJobId,task);
+  const path='/api/aiide-video/jobs/'+task+'/media';
+  const download=await h.binary(path+'?download=1');
+  assert.match(download.headers.get('content-disposition'),/^attachment/);
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()),await readFile(fixture));
+  for(const [range,start,end] of [['bytes=4-7',4,7],['bytes=-8',raw.length-8,raw.length-1]]){
+   const partial=await h.binary(path,{range});
+   assert.equal(partial.status,206);
+   assert.equal(partial.headers.get('content-range'),'bytes '+start+'-'+end+'/'+raw.length);
+   assert.deepEqual(new Uint8Array(await partial.arrayBuffer()),raw.slice(start,end+1));
+  }
+  assert.equal((await h.binary(path,{range:'bytes='+raw.length+'-'})).status,416);
   assert.deepEqual(h.getStats(),{posts:1,polls:1,downloads:1});
   assert.equal((await h.call('/api/aiide-video/submit','POST',{input,consent:'I_ACCEPT_PROVIDER_CHARGES'})).status,429);
  }finally{await h.close();}

@@ -38,3 +38,12 @@ test('AIIDE inner upstream status takes precedence over outer accepted status', 
  const status=await adapter.getStatus('task_existing_12345');
  assert.equal(status.state,'running');assert.equal(status.videoUrl,null);
 });
+
+test('AIIDE failure with an error message in result_url does not expose a playable result',async()=>{
+ const fetchImpl=async(url,opts)=>{
+  assert.equal(opts.method,'GET');
+  return Response.json({data:{status:'FAILURE',result_url:'Bad Request',data:{status:'failed',error:{code:'InvalidParameter'}}}});
+ };
+ const adapter=createAiideVideoAdapter({apiKey:'local-mock-failure-key',networkAllowed:true,fetchImpl});
+ assert.deepEqual(await adapter.getStatus('task_existing_12345'),{state:'failed',errorCode:'AIIDE_INVALID_PARAMETER',videoUrl:null});
+});

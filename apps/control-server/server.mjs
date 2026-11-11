@@ -1,6 +1,7 @@
 import {teamPassword,validTeamPassword} from './team-password.mjs';
 /** Dramasaku local operator console. Loopback-only; paid video/TTS requires explicit opt-in. */
 import http from 'node:http';
+import {createReadStream} from 'node:fs';
 import {readFile} from 'node:fs/promises';
 import {randomBytes,timingSafeEqual,createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
@@ -35,7 +36,7 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
  const seedance=createSeedanceLocalStore({root:assetRoot||resolve(dirname(vaultFile),'seedance-assets')});
  const workspace=createWorkspaceStore({file:resolve(dirname(vaultFile),'creative-workspace.json')});
  const live=createLocalLiveEngine({root:resolve(dirname(vaultFile),'live-video'),loadApiKey:()=>vault.getForServerOnly('volcengine_las'),fetchImpl:liveFetchImpl,enabled:liveEnabled,capabilityVerified,maxDaily:1});
- const aiideVideo=createAiideVideoEngine({root:resolve(dirname(vaultFile),'aiide-video'),keyPool:keyPools,activation,fetchImpl:aiideVideoFetchImpl,enabled:aiideVideoEnabled,capabilityVerified:aiideVideoCapabilityVerified,readOnlyEnabled:aiideReadOnlyEnabled,allowedMediaHosts:aiideMediaHosts,resolveAsset:id=>seedance.resolveAsset(id),maxDaily:1});
+ const aiideVideo=createAiideVideoEngine({root:resolve(dirname(vaultFile),'aiide-video'),keyPool:keyPools,activation,fetchImpl:aiideVideoFetchImpl,enabled:aiideVideoEnabled,capabilityVerified:aiideVideoCapabilityVerified,readOnlyEnabled:aiideReadOnlyEnabled,allowedMediaHosts:aiideMediaHosts,archiveVideo:async(path,id,projectId)=>seedance.addAsset(await readFile(path),'aiide-'+id+'.mp4',{projectId,generatedJobId:id}),resolveAsset:id=>seedance.resolveAsset(id),maxDaily:1});
  const tts=createLocalTtsEngine({root:resolve(dirname(vaultFile),'tts-audio'),loadApiKey:slot=>vault.getForServerOnly(slot),fetchImpl:ttsFetchImpl,enabled:ttsEnabled,capabilityVerified:ttsCapabilityVerified,aiideCapabilityVerified:aiideTtsCapabilityVerified,maxDaily:1});
  const production=createProductionStore({root:resolve(dirname(vaultFile),'production'),workspace,assets:seedance});
  const packages=createProjectPackages({root:dirname(vaultFile),workspace,assets:seedance,production,tts});
@@ -158,21 +159,33 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
    if(req.method==='POST'&&p==='/api/project-package/preview')return send(200,packages.preview(await readJson(95_000_000)));
    if(req.method==='POST'&&p==='/api/project-package/import'){const input=await readJson(95_000_000);return send(200,await edit(()=>packages.import(input)));}
    if(req.method==='GET'&&p==='/api/studio/status')return send(200,{version:'0.8.0',mode:'local_internal',tools:await localTools(),paidVideoEnabled:activation?(await activation.status()).ready:aiideVideoEnabled&&aiideVideoCapabilityVerified,paidTtsEnabled:ttsEnabled&&(ttsCapabilityVerified||aiideTtsCapabilityVerified),paidImageEnabled:false,readOnlyAiide:aiideReadOnlyEnabled,modelCount:aiideVideoCatalog().models.length,sharing:'portable_package',maxPackageMediaBytes:64*1024*1024,multiUser:false});
-   if(req.method==='GET'&&p==='/api/aiide-video/status')return send(200,await aiideVideo.list());
-   if(req.method==='POST'&&p==='/api/aiide-video/import')return send(201,{job:await aiideVideo.importTask(await readJson(3000))});
-   if(req.method==='POST'&&p==='/api/aiide-video/submit'){const body=await readJson(16000);await inspectInput(body?.input);return send(201,{job:await aiideVideo.submit(body)});}
+   if(req.method==='GET'&&p==='/api/aiide-video/status')return send(200,{...await aiideVideo.list(),serverPolling:true});
+   if(req.method==='POST'&&p==='/api/aiide-video/import')return send(201,{job:await aiideVideo.importTask(await readJson(3000),await currentProject())});
+   if(req.method==='POST'&&p==='/api/aiide-video/submit'){const body=await readJson(16000);await inspectInput(body?.input);return send(201,{job:await aiideVideo.submit(body,await currentProject())});}
    if(req.method==='POST'&&/^\/api\/aiide-video\/jobs\/[a-f0-9]{24}\/check$/.test(p))return send(200,{job:await aiideVideo.check(p.split('/')[4])});
    if(req.method==='POST'&&/^\/api\/aiide-video\/jobs\/[a-f0-9]{24}\/attach$/.test(p)){
-     const projectId=await currentProject();if(!projectId)return fail(409,'PROJECT_NOT_SAVED');
-     const info=await aiideVideo.mediaPath(p.split('/')[4]);info.stream.destroy();
-     if(info.size>20*1024*1024)return fail(413,'ASSET_TOO_LARGE');
-     const bytes=await readFile(info.path),digest=createHash('sha256').update(bytes).digest('hex');
-     const existing=seedance.listAssets().find(a=>a.projectId===projectId&&a.sha256===digest);
-     const asset=existing||await seedance.addAsset(bytes,'aiide-'+p.split('/')[4]+'.mp4',{projectId});await seedance.inspectAsset(asset.id);return send(201,{asset});
+     return await edit(async()=>{
+      const asset=await aiideVideo.attach(p.split('/')[4],await currentProject());
+      return send(201,{asset});
+     });
    }
    if(req.method==='GET'&&/^\/api\/aiide-video\/jobs\/[a-f0-9]{24}\/media$/.test(p)){
      const info=await aiideVideo.mediaPath(p.split('/')[4]);
-     res.writeHead(200,{'content-type':'video/mp4','content-length':info.size,'content-disposition':'inline; filename=dramasaku-aiide-video.mp4',...security});info.stream.pipe(res);return;
+     const disposition=u.searchParams.get('download')==='1'?'attachment':'inline';
+     const headers={...security,'accept-ranges':'bytes','content-type':'video/mp4','content-disposition':disposition+'; filename="aiide-'+p.split('/')[4]+'.mp4"'};
+     let stream=info.stream;
+     if(req.headers.range){
+      const match=/^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
+      const start=match?.[1]?Number(match[1]):Math.max(0,info.size-Number(match?.[2]));
+      const end=match?.[1]&&match[2]?Math.min(info.size-1,Number(match[2])):info.size-1;
+      stream.destroy();
+      if(!match||(!match[1]&&!match[2])||!Number.isSafeInteger(start)||start>end){
+       res.writeHead(416,{...headers,'content-range':'bytes */'+info.size});res.end();return;
+      }
+      stream=createReadStream(info.path,{start,end});
+      res.writeHead(206,{...headers,'content-range':'bytes '+start+'-'+end+'/'+info.size,'content-length':end-start+1});
+     }else res.writeHead(200,{...headers,'content-length':info.size});
+     res.once('close',()=>stream.destroy());stream.on('error',()=>res.destroy());stream.pipe(res);return;
    }
    if(req.method==='GET'&&p==='/api/live/status')return send(200,await live.list());
    if(req.method==='POST'&&p==='/api/live/submit')return send(201,{job:await live.submit(await readJson(16000))});
@@ -272,7 +285,18 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
    timer.unref();
   }
   schedule();
-  server.once('close',()=>clearTimeout(timer));
+  let pollTimer;
+  const retryAt=new Map();
+  async function pollResults(){
+   for(const id of aiideVideo.pendingIds()){
+    if(!server.listening||Date.now()<(retryAt.get(id)||0))continue;
+    try{await aiideVideo.check(id);retryAt.delete(id);}
+    catch{retryAt.set(id,Date.now()+60_000);}
+   }
+   if(server.listening){pollTimer=setTimeout(pollResults,10_000);pollTimer.unref();}
+  }
+  if(aiideAutoActivate||aiideVideoEnabled||aiideReadOnlyEnabled){pollTimer=setTimeout(pollResults,10_000);pollTimer.unref();}
+  server.once('close',()=>{clearTimeout(timer);clearTimeout(pollTimer);});
  }};
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){

@@ -53,6 +53,10 @@ export function createAiideVideoAdapter({apiKey,fetchImpl=fetch,networkAllowed=f
    const state=statusMap[String(raw??'').toUpperCase()];
    if(!state||state==='unknown')throw new AiideVideoError('AIIDE_STATUS_UNRECOGNIZED');
    const nested=data?.data?.data||{};
+   if(state==='failed'){
+    const errorCode=nested.error?.code==='InvalidParameter'?'AIIDE_INVALID_PARAMETER':'AIIDE_PROVIDER_FAILED';
+    return {state,errorCode,videoUrl:null};
+   }
    // AIIDE's documented response puts video_url inside data.data, while some
    // channels may use data.result_url; never expose signed URLs in API responses.
    const url=nested.content?.video_url||nested.output?.video_url||nested.result?.video_url||nested.result?.download_url||nested.result?.url||nested.metadata?.video_url||nested.metadata?.download_url||nested.metadata?.url||nested.video_url||nested.download_url||nested.url||data?.data?.result_url||data?.data?.video_url||data?.data?.download_url||data?.result_url||data?.video_url||null;
