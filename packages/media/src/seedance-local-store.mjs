@@ -24,7 +24,7 @@ export function createSeedanceLocalStore({root,clock=Date.now}={}){
  const folder=resolve(root),idx=join(folder,'index.json');let assets=[],jobs=[],pending=[],chain=Promise.resolve();
  async function persist(nextAssets=assets,nextPending=pending){const tmp=join(folder,`index-${randomBytes(8).toString('hex')}.tmp`);await writeFile(tmp,JSON.stringify({schema:1,assets:nextAssets,jobs,pending:nextPending}),{mode:0o600,flag:'wx'});await rename(tmp,idx);}
  const serialize=fn=>{const task=chain.then(fn);chain=task.catch(()=>{});return task;};
- const expiresAt=asset=>Date.parse(asset.createdAt)+72*60*60*1000;
+ const expiresAt=asset=>asset.retention==='project_master'?Infinity:Date.parse(asset.createdAt)+72*60*60*1000;
  async function removeFiles(ids){
   if(ids.length){
    const removed=new Set(ids),next=assets.filter(asset=>!removed.has(asset.id)),todo=[...new Set([...pending,...ids])];
@@ -41,7 +41,7 @@ export function createSeedanceLocalStore({root,clock=Date.now}={}){
  }
  return Object.freeze({
  async init(){await mkdir(folder,{recursive:true,mode:0o700});try{const state=JSON.parse(await readFile(idx,'utf8'));if(state.schema!==1||!Array.isArray(state.assets)||!Array.isArray(state.jobs))throw Error('INVALID_LOCAL_INDEX');assets=state.assets;jobs=state.jobs;pending=state.pending??[];if(!Array.isArray(pending)||pending.some(id=>typeof id!=='string'||!validId.test(id)))throw Error('INVALID_LOCAL_INDEX');}catch(e){if(e.code!=='ENOENT')throw e;await persist();}},
- listAssets(){return structuredClone(assets).reverse().map(asset=>({...asset,expiresAt:new Date(expiresAt(asset)).toISOString()}));},
+ listAssets(){return structuredClone(assets).reverse().map(asset=>({...asset,expiresAt:asset.retention==='project_master'?null:new Date(expiresAt(asset)).toISOString()}));},
  async expireAssets(inUse=()=>false){return serialize(()=>removeFiles(assets.filter(a=>expiresAt(a)<=clock()&&!inUse(a.id)).map(a=>a.id)));},
  async removeAsset(id,projectId){return serialize(async()=>{
   const found=this.resolveAsset(id);
@@ -49,6 +49,11 @@ export function createSeedanceLocalStore({root,clock=Date.now}={}){
   await removeFiles([id]);
  });},
  resolveAsset(id){return validId.test(String(id))?assets.find(x=>x.id===id):null;},
+ async pinMaster(id,projectId){return serialize(async()=>{
+  const a=this.resolveAsset(id);if(!a||(a.projectId&&a.projectId!==projectId))throw new AssetValidationError('ASSET_NOT_FOUND');
+  const next=assets.map(item=>item.id===id?{...item,retention:'project_master'}:item);
+  await persist(next);assets=next;return structuredClone(this.resolveAsset(id));
+ });},
  async addAsset(bytes,name,{projectId=null,generatedJobId=null,fromPackage=false}={}){return serialize(async()=>{
   if(generatedJobId&&!validId.test(generatedJobId))throw new AssetValidationError('INVALID_JOB_ID');
   const existing=generatedJobId&&assets.find(a=>a.generatedJobId===generatedJobId&&a.projectId===projectId);

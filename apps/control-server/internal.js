@@ -39,7 +39,7 @@ function paintAssetLibrary(){
   remove.classList.add('library-delete');remove.setAttribute('aria-label','Hapus '+asset.name);remove.title='Hapus aset';
   preview.append(internalMedia(asset),remove);
   const limit=new Date(asset.expiresAt||Date.parse(asset.createdAt)+72*3600000);
-  card.append(preview,internalNode('strong',asset.name),internalNode('small','Hapus otomatis '+limit.toLocaleString()));
+  card.append(preview,internalNode('strong',asset.name),internalNode('small',asset.retention==='project_master'?'Master proyek · tersimpan sampai dihapus':'Hapus otomatis '+limit.toLocaleString()));
   if(asset.generatedJobId){
    const link=internalNode('a','Unduh MP4');link.href='/api/aiide-video/jobs/'+asset.generatedJobId+'/media?download=1';link.download=asset.name;
    card.append(internalNode('small','Hasil generate AIIDE'),link);

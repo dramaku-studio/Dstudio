@@ -86,6 +86,7 @@ export function createAiideVideoEngine({root,keyPool,fetchImpl=fetch,enabled=fal
    initialized=true;
   },
   // Only known provider task IDs are polled. A restart must never resubmit a job.
+  job(id){ready();return pub(find(id));},
   pendingIds(){return jobs.filter(j=>j.providerTaskId&&['submitted','queued','running','download_pending'].includes(j.status)&&!j.errorCode).map(j=>j.id);},
   async list(){ready();const pool=await keyPool.preview('video','aiide');const keys=await accounts();const readiness=activation?await activation.status():null;return {provider:'aiide',enabled:readiness?readiness.ready:enabled,readOnlyEnabled,capabilityVerified,credentialVerified:readiness?.ready||false,activationState:readiness?.state||'manual',availableModels:readiness?.models||[],autoActivation:!!activation,configured:keys.length>0,maxDaily:dailyCap(pool.selected),usedToday:usedToday(),autoRetry:false,costEstimate:'provider_quote_required',modelCompatibility:'AIIDE public contracts 2026-11-08; local tests only, live account unverified',availableAccounts:keys.map(k=>({id:k.id,label:k.label})),jobs:jobs.slice(-30).reverse().map(pub)};},
   // Import a task already created on AIIDE. Only GET status and GET media; no billable POST.

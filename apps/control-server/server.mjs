@@ -1,8 +1,11 @@
+import {createWorkflowStore,localWorkflowPlan,validateWorkflow,workflowTimeline} from './workflow-store.mjs';
+import {extractWorkflowDocument} from './workflow-documents.mjs';
+import {runWorkflowLlm} from './workflow-llm.mjs';
 import {teamPassword,validTeamPassword} from './team-password.mjs';
 /** Dramasaku local operator console. Loopback-only; paid video/TTS requires explicit opt-in. */
 import http from 'node:http';
 import {createReadStream} from 'node:fs';
-import {readFile} from 'node:fs/promises';
+import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {randomBytes,timingSafeEqual,createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {dirname,join,resolve} from 'node:path';
@@ -25,7 +28,7 @@ import {createProjectPackages} from './project-package.mjs';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const dir=dirname(fileURLToPath(import.meta.url));
-export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,adminToken=process.env.DRAMASAKU_LOCAL_ADMIN_TOKEN,vaultKey=process.env.DRAMASAKU_VAULT_KEY_B64,vaultFile=process.env.DRAMASAKU_VAULT_FILE||resolve(dir,'../../.local-private/credentials.enc.json'),demo=null,assetRoot,liveEnabled=false,capabilityVerified=false,liveFetchImpl=fetch,aiideAutoActivate=false,aiideVideoEnabled=false,aiideVideoCapabilityVerified=false,aiideReadOnlyEnabled=false,aiideVideoFetchImpl=fetch,aiideMediaHosts=[],ttsEnabled=false,ttsCapabilityVerified=false,aiideTtsCapabilityVerified=false,ttsFetchImpl=fetch,keyTestFetchImpl=fetch}={}){
+export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,adminToken=process.env.DRAMASAKU_LOCAL_ADMIN_TOKEN,vaultKey=process.env.DRAMASAKU_VAULT_KEY_B64,vaultFile=process.env.DRAMASAKU_VAULT_FILE||resolve(dir,'../../.local-private/credentials.enc.json'),demo=null,assetRoot,liveEnabled=false,capabilityVerified=false,liveFetchImpl=fetch,aiideAutoActivate=false,aiideVideoEnabled=false,aiideVideoCapabilityVerified=false,aiideReadOnlyEnabled=false,aiideVideoFetchImpl=fetch,aiideMediaHosts=[],ttsEnabled=false,ttsCapabilityVerified=false,aiideTtsCapabilityVerified=false,ttsFetchImpl=fetch,keyTestFetchImpl=fetch,workflowLlmFetchImpl=fetch}={}){
  if(!['127.0.0.1','::1'].includes(host))throw Error('Local operator console refuses public bind');
  if(typeof adminToken!=='string'||adminToken.length<20)throw Error('Set DRAMASAKU_LOCAL_ADMIN_TOKEN (20+ chars); not committed to repository');
  const password=teamLogin?teamPassword(join(dirname(vaultFile),'team-password.json')):null;
@@ -39,6 +42,17 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
  const aiideVideo=createAiideVideoEngine({root:resolve(dirname(vaultFile),'aiide-video'),keyPool:keyPools,activation,fetchImpl:aiideVideoFetchImpl,enabled:aiideVideoEnabled,capabilityVerified:aiideVideoCapabilityVerified,readOnlyEnabled:aiideReadOnlyEnabled,allowedMediaHosts:aiideMediaHosts,archiveVideo:async(path,id,projectId)=>seedance.addAsset(await readFile(path),'aiide-'+id+'.mp4',{projectId,generatedJobId:id}),resolveAsset:id=>seedance.resolveAsset(id),maxDaily:1});
  const tts=createLocalTtsEngine({root:resolve(dirname(vaultFile),'tts-audio'),loadApiKey:slot=>vault.getForServerOnly(slot),fetchImpl:ttsFetchImpl,enabled:ttsEnabled,capabilityVerified:ttsCapabilityVerified,aiideCapabilityVerified:aiideTtsCapabilityVerified,maxDaily:1});
  const production=createProductionStore({root:resolve(dirname(vaultFile),'production'),workspace,assets:seedance});
+ const workflow=createWorkflowStore({root:resolve(dirname(vaultFile),'workflow'),workspace,assets:seedance,submitVideo:{
+  prepare:async(shot,data,settings)=>{
+   if(!settings||typeof settings!=='object')throw Object.assign(Error('WORKFLOW_VIDEO_SETTINGS'),{code:'WORKFLOW_VIDEO_SETTINGS',status:422});
+   for(const ref of shot.assetIds){const a=data.assets.find(a=>a.id===ref);if(a?.assetId)await seedance.inspectAsset(a.assetId);}
+   if(shot.assetIds.length&&settings.mode==='text_to_video')throw Object.assign(Error('WORKFLOW_REFERENCES_REQUIRED'),{code:'WORKFLOW_REFERENCES_REQUIRED',status:422});
+   const input={model:settings.model,mode:settings.mode,prompt:shot.prompt||workflow.promptFor(shot,data),duration:shot.duration,ratio:settings.ratio||data.target.ratio,resolution:settings.resolution,generateAudio:settings.generateAudio===true,watermark:false,assets:settings.mode==='text_to_video'?[]:shot.assetIds.map(ref=>data.assets.find(a=>a.id===ref)).filter(a=>a?.assetId).map(a=>{const f=seedance.resolveAsset(a.assetId);return {assetId:a.assetId,role:settings.mode==='image_to_video'?'first_frame':'reference_'+f.kind};})};
+   compileAiideRequest(input,id=>seedance.resolveAsset(id),{forDispatch:true});return {input,consent:'I_ACCEPT_PROVIDER_CHARGES'};
+  },
+  send:(request,projectId)=>aiideVideo.submit(request,projectId),
+  status:id=>{try{return aiideVideo.job(id);}catch{return null;}}
+ }});
  const packages=createProjectPackages({root:dirname(vaultFile),workspace,assets:seedance,production,tts});
  let edits=Promise.resolve();const edit=fn=>{const p=edits.then(fn);edits=p.catch(()=>{});return p;};
  const currentProject=async()=>(await workspace.read())?.projectId||null;
@@ -55,6 +69,7 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
   }catch{return {name:command,available:false};}
  }));
  demo??=createOfflineDemo({getCreativeInput:async()=>(await workspace.read())?.workspace?.input});
+ const workflowOperations=new Set();
  const sessions=new Map(),failed=new Map();const originSet=new Set([`http://127.0.0.1:${port}`,`http://localhost:${port}`,`http://[::1]:${port}`]);
  const denyKey=(a,b)=>{const h1=createHash('sha256').update(String(a)).digest(),h2=createHash('sha256').update(String(b)).digest();return !timingSafeEqual(h1,h2);};
  function session(req){const cookie=req.headers.cookie||'';const m=/(?:^|;\s*)ds_session=([a-f0-9]{64})(?:;|$)/.exec(cookie);if(!m)return null;const s=sessions.get(m[1]);if(!s)return null;if(s.expires<Date.now()){sessions.delete(m[1]);return null;}return s;}
@@ -86,6 +101,7 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
    if(req.method==='GET'&&p==='/internal.js'){res.writeHead(200,{'content-type':'text/javascript; charset=utf-8',...security});res.end(await readFile(join(dir,'internal.js')));return;}
    if(req.method==='GET'&&p==='/app.js'){res.writeHead(200,{'content-type':'text/javascript; charset=utf-8',...security});res.end(await readFile(join(dir,'app.js')));return;}
    if(req.method==='GET'&&p==='/api/health')return send(200,{ok:true,mode:'local_operator',production:false,paidCallsEnabled:(liveEnabled&&capabilityVerified)||(activation?(await activation.status({cachedOnly:true})).ready:(aiideVideoEnabled&&aiideVideoCapabilityVerified))||(ttsEnabled&&(ttsCapabilityVerified||aiideTtsCapabilityVerified))});
+   if(req.method==='GET'&&p==='/workflow.js'){res.writeHead(200,{'content-type':'text/javascript; charset=utf-8',...security});res.end(await readFile(join(dir,'workflow.js')));return;}
    const s=session(req);
    if(req.method==='GET'&&p==='/api/session')return send(200,{authenticated:!!s,csrf:s?.csrf??null,offlineOnly:!aiideAutoActivate&&!aiideVideoEnabled&&!liveEnabled&&!ttsEnabled});
    if(req.method==='POST'&&p==='/api/login'){
@@ -100,7 +116,7 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
      });
    }
    if(!s)return fail(401,'AUTH_REQUIRED');
-   if(req.method==='POST'||req.method==='DELETE'){
+   if(req.method==='POST'||req.method==='DELETE'||req.method==='PATCH'){
      if(!req.headers['x-dramasaku-csrf']||denyKey(req.headers['x-dramasaku-csrf'],s.csrf))return fail(403,'CSRF_DENIED');
    }
    if(req.method==='POST'&&p==='/api/team/password'){
@@ -117,6 +133,61 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
    }
    if(req.method==='POST'&&p==='/api/logout'){
      const m=/(?:^|;\s*)ds_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie||'');if(m)sessions.delete(m[1]);return send(200,{ok:true},{'set-cookie':'ds_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'});
+   }
+   if(req.method==='GET'&&p==='/api/workflow'){
+    const state=await workflow.state(),live=await aiideVideo.list();
+    state.dispatches=state.dispatches.map(d=>{if(!d.jobId)return d;try{return {...d,job:aiideVideo.job(d.jobId)};}catch{return d;}});
+    let llmModels=[];if(activation)llmModels=(await activation.status()).catalogModels?.filter(m=>/(deepseek|claude|gpt-|gemini|kimi|glm)/i.test(m)&&!/(image|audio|video|veo|sora)/i.test(m))||[];
+    return send(200,{...state,live,llmModels});
+   }
+   if(req.method==='GET'&&p==='/api/workflow/example')return send(200,JSON.parse(await readFile(resolve(dir,'../../examples/workflow-romcom.json'),'utf8')));
+   if(req.method==='POST'&&p==='/api/workflow/save'){const body=await readJson(700000);return send(200,await edit(()=>workflow.save(body)));}
+   if(req.method==='POST'&&p==='/api/workflow/approve'){const body=await readJson();return send(200,await edit(()=>workflow.approve(body)));}
+   if(req.method==='POST'&&p==='/api/workflow/rollback'){const body=await readJson();return send(200,await edit(()=>workflow.rollback(body)));}
+   if(req.method==='POST'&&p==='/api/workflow/master'){const body=await readJson();return send(200,await edit(()=>workflow.attachMaster(body)));}
+   if(req.method==='POST'&&p==='/api/workflow/storyboard'){const body=await readJson();return send(200,await edit(()=>workflow.setStoryboard(body)));}
+   if(req.method==='POST'&&p==='/api/workflow/dispatch'){const body=await readJson();return send(200,await edit(()=>workflow.dispatch(body)));}
+   if(req.method==='POST'&&p==='/api/workflow/analyse'){
+    const body=await readJson(10000),before=await workflow.state();
+    if(body.expectedRevision!==before.revision||body.projectId!==before.projectId)return fail(409,'WORKFLOW_CHANGED_RELOAD');
+    const operationKey=before.projectId+':'+before.revision;
+    if(workflowOperations.has(operationKey))return fail(409,'WORKFLOW_OPERATION_RUNNING');
+    workflowOperations.add(operationKey);
+    try{
+    let data=before.data;
+    if(body.operation==='qc'){
+     if(data.rubric.length!==10)return fail(422,'WORKFLOW_RUBRIC_REQUIRED');
+     const result=await runWorkflowLlm({data,operation:'qc',model:body.model,keyPools,activation,fetchImpl:workflowLlmFetchImpl,consent:body.consent});
+     data=validateWorkflow({...data,scores:result.scores,hardChecks:result.hardChecks,qcSource:'aiide'});
+    }else if(body.mode==='aiide'){
+     const result=await runWorkflowLlm({data,operation:'analyse',model:body.model,keyPools,activation,fetchImpl:workflowLlmFetchImpl,consent:body.consent});
+     data=validateWorkflow({...data,assets:result.assets,scenes:result.scenes,shots:result.shots,hardGoals:result.hardGoals,scores:[],hardChecks:[],qcSource:null});
+    }else data=validateWorkflow(localWorkflowPlan(data));
+    if(!workflowTimeline(data).valid)return fail(422,'WORKFLOW_DURATION_MISMATCH');
+    return send(200,await edit(()=>workflow.save({...body,data,note:body.operation==='qc'?'Review QC AIIDE':body.mode==='aiide'?'Mapping AIIDE':'Kerangka mapping lokal'})));
+    }finally{workflowOperations.delete(operationKey);}
+
+   }
+   if(req.method==='GET'&&/^\/api\/workflow\/documents\/[a-f0-9]{24}$/.test(p)){
+    const state=await workflow.state(),item=state.data.documents.find(d=>d.id===p.split('/')[4]);
+    if(!item)return fail(404,'DOCUMENT_NOT_FOUND');
+    const bytes=await readFile(resolve(dirname(vaultFile),'workflow','documents',item.id+'.source'));
+    return send(200,{text:await extractWorkflowDocument(bytes,item.name)});
+   }
+   if(req.method==='POST'&&p==='/api/workflow/documents'){
+    const body=await readJson(7100000);
+    if(typeof body.name!=='string'||body.name.length>180||typeof body.base64!=='string'||body.base64.length>7000000)return fail(422,'DOCUMENT_MAX_5MB');
+    const bytes=Buffer.from(body.base64,'base64');if(bytes.toString('base64')!==body.base64)return fail(422,'DOCUMENT_INVALID');
+    const text=await extractWorkflowDocument(bytes,body.name),state=await workflow.state(),documentId=randomBytes(12).toString('hex');
+    if(body.expectedRevision!==state.revision||body.projectId!==state.projectId)return fail(409,'WORKFLOW_CHANGED_RELOAD');
+    const folder=resolve(dirname(vaultFile),'workflow','documents');await mkdir(folder,{recursive:true,mode:0o700});
+    await writeFile(join(folder,documentId+'.source'),bytes,{mode:0o600,flag:'wx'});
+    const data={...state.data,documents:[...state.data.documents,{id:documentId,name:body.name,sha256:createHash('sha256').update(bytes).digest('hex')}]};
+    return send(201,{state:await edit(()=>workflow.save({...body,data,note:'Lampiran dokumen'})),text});
+   }
+   if(req.method==='GET'&&p==='/api/workflow/export'){
+    const data=await workflow.state(),body=JSON.stringify({kind:'studio.workflow-draft',version:1,project:data.data},null,2);
+    res.writeHead(200,{'content-type':'application/json; charset=utf-8','content-disposition':'attachment; filename="workflow-draft.json"',...security});res.end(body);return;
    }
    if(req.method==='GET'&&p==='/api/workspace'){const saved=await workspace.read();return send(200,{saved,currentInputHash:saved?.workspace?.input?portableHash(saved.workspace.input):null});}
    if(req.method==='POST'&&p==='/api/workspace/preview')return send(200,workspace.preview(await readJson(40_000)));
@@ -270,13 +341,13 @@ export function createLocalConsole({host='127.0.0.1',port=4184,teamLogin=false,a
   await seedance.expireAssets(production.isRenderSource);
   await production.pruneMissingAssets();
  }
- return {server,vault,keyPools,demo,seedance,workspace,live,aiideVideo,tts,production,packages,listen:async()=>{await seedance.init();await live.init();await aiideVideo.init();await tts.init();await production.init();
+ return {server,vault,keyPools,demo,seedance,workspace,live,aiideVideo,tts,production,packages,workflow,listen:async()=>{await seedance.init();await live.init();await aiideVideo.init();await tts.init();await production.init();
   await cleanAssets();
   await new Promise(resolve=>server.listen(port,host,resolve));
   let timer;
   function schedule(){
    if(!server.listening)return;
-   const deadlines=seedance.listAssets().filter(a=>!production.isRenderSource(a.id)).map(a=>Date.parse(a.expiresAt)-Date.now());
+   const deadlines=seedance.listAssets().filter(a=>a.expiresAt&&!production.isRenderSource(a.id)).map(a=>Date.parse(a.expiresAt)-Date.now());
    const delay=Math.max(1000,Math.min(60_000,...deadlines));
    timer=setTimeout(async()=>{
     try{await edit(cleanAssets);}catch{console.error('Pembersihan aset gagal. Akan dicoba kembali.');}

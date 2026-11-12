@@ -25,3 +25,17 @@ test('72 hours per upload, manual removal is project scoped, interrupted cleanup
  await assert.rejects(access(join(root,later.id+'.bin')),{code:'ENOENT'});
  assert.deepEqual(store.listAssets(),[]);
 });
+
+test('project master survives its upload expiry and restart, and still supports explicit deletion',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'ds-master-retention-'));let now=Date.now();
+ const store=createSeedanceLocalStore({root,clock:()=>now});
+ try{
+  await store.init();
+  const bytes=Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000b49444154789c636000020000050001a5f645400000000049454e44ae426082','hex');
+  const a=await store.addAsset(bytes,'master.png',{projectId:'project-a'});
+  await store.pinMaster(a.id,'project-a');now+=73*3600000;await store.expireAssets();
+  assert(store.resolveAsset(a.id));assert.equal(store.listAssets()[0].expiresAt,null);
+  const reopened=createSeedanceLocalStore({root,clock:()=>now});await reopened.init();await reopened.expireAssets();assert(reopened.resolveAsset(a.id));
+  await reopened.removeAsset(a.id,'project-a');assert(!reopened.resolveAsset(a.id));
+ }finally{await rm(root,{recursive:true,force:true});}
+});
